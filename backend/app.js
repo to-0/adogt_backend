@@ -71,12 +71,13 @@ app.get('/users/signUser', (req,res)=>{
     db.one('SELECT * FROM users WHERE users.name = $1 and users.password = $2',[username,password])
     .then((data)=>{
         t = uuidv4();
-        tokens[t] = data.id
+        tokens[t] = {"id":data.id,"shelter":data.shelter}
+        console.log(data)
         console.log(tokens)
         res.json({'message':'OK','token':t});
     })
     .catch((error)=>{
-        res.json({'message':'Invalid username or password'})
+        res.status(400).json({'message':'Invalid username or password'})
     })
 
 })
@@ -85,24 +86,25 @@ app.post('/users/register',(req,res)=>{
     username = req.body.username;
     email = req.body.email;
     password = req.body.password;
+    shelter = req.body.shelter;
     console.log(username,password,email);
     // ak pouzivatel neexistuje
     if (check_user(username,email) == false){
-        db.one('INSERT INTO users(name,email,password) VALUES($1, $2, $3) RETURNING id', [username, email, password])
+        db.one('INSERT INTO users(name,email,password,shelter) VALUES($1, $2, $3,$4) RETURNING id,shelter', [username, email, password,shelter])
         .then((data)=>{
             t = uuidv4();
             console.log(data.id)
-            //k tokenom mam idcka
-            tokens[t] = data.id
+            //k tokenom mam idcka a rolu ci je utulok alebo nie
+            tokens[t] = {"id":data.id,"shelter":data.shelter}
             console.log(tokens)
             res.json({'message':'OK','token':t});
         })
         .catch((error)=>{
-            res.json({'message':'Fail'});
+            res.status(400).json({'message':'Fail'});
         })
     }
     else{
-        res.send({'message':'User already exists'});
+        res.status(400).send({'message':'User already exists'});
     }
 })
 
