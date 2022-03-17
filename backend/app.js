@@ -9,7 +9,7 @@ app.use(cors())
 const port = 8000
 
 //ulozene tokeny podla ID pouzivatela
-var tokens = {"testToken":{id:8,shelter:true}}
+var tokens = {"testToken":{id:7,shelter:true}}
 
 
 // aby som videl co mi psoiela user v request body
@@ -170,6 +170,55 @@ app.post('/forms/create', (req,res)=>{
     })
     .catch((error)=>{
         req.status(400).send("Something went wrong")
+    })
+})
+//načítanie detailu formulára
+app.get('/forms/detail',(req,res)=>{
+    token = req.query.token;
+    form_id = req.query.form_id
+    if(tokens[token] == undefined || form_id == undefined){
+        res.status(400).send("Invalid token");
+        return
+    }
+    db.one("SELECT * FROM forms WHERE id=$1",[form_id])
+    .then((data)=>{
+        result = {
+            "form_id": form_id,
+            "dog_id": data.dog_id,
+            "details": data.details,
+            "type": data.type,
+            "created_at": data.date
+        }
+        res.json(result)
+    })
+    .catch((error)=>{
+        console.log(error)
+        res.status(400).send("Wrong request")
+    })
+})
+app.get('/forms/getAll',(req,res)=>{
+    token = req.query.token;
+    if(tokens[token] == undefined){
+        res.status(400).send("Invalid token");
+        return
+    }
+    db.many("SELECT * FROM forms WHERE user_id=$1 ORDER BY id",[tokens[token]["id"]])
+    .then((data)=>{
+        forms = []
+        for(var i=0; i<data.length;i++){
+            forms.push( {
+                "id": data[i].id,
+                "dog_id": data[i].dog_id,
+                "type": data[i].form_type,
+                "created_at": data[i].created_at
+            });
+        }
+        console.log(forms)
+        res.json(forms)
+    })
+    .catch((error)=>{
+        console.log(error)
+        res.status(400).send("Wrong request")
     })
 })
 // editovanie formulara
