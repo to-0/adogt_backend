@@ -22,17 +22,6 @@ app.use(bodyParser.urlencoded({ extended: true }));
 const pgp = require('pg-promise')(/* options */)
 const db = pgp(`postgres://${process.env["DB_USER"]}:${process.env["DB_PASS"]}@localhost:5432/mtaa_zadanie2`)
 
-function test(){
-    db.one('INSERT INTO users(name,email,password) VALUES($1, $2, $3) RETURNING id', ['test','email@email.email','heslo'])
-    .then((data)=>{
-        console.log("Success");
-    })
-    .catch((error)=>{
-        console.log("NEMA NIC");
-        console.log(error);
-    })
-}
-
 // vrati false ak pouzivatel neexistuje
 function check_user(username,email){
     db.one('SELECT * FROM users WHERE users.username = $1 or users.email = $2',[username,email])
@@ -48,9 +37,16 @@ function check_user(username,email){
     return false;
 }
 
+function check_token(token,request){
+    
+}
 
-
+// ----------------------------
+//      SAMOTNE REQUESTY 
+// ----------------------------
 app.get('/', (req, res) => {
+    console.log(req.params)
+    console.log(req.query)
   res.send('Test');
 })
 
@@ -66,8 +62,8 @@ app.get('/api/dbtest', (req, res) => {
 })
 // prihlasenie pouzivatela
 app.get('/users/signUser', (req,res)=>{
-    username = req.body.username
-    password = req.body.password
+    username = req.query.username
+    password = req.query.password
     db.one('SELECT * FROM users WHERE users.name = $1 and users.password = $2',[username,password])
     .then((data)=>{
         t = uuidv4();
@@ -107,8 +103,114 @@ app.post('/users/register',(req,res)=>{
         res.status(400).send({'message':'User already exists'});
     }
 })
+// vytvorenie formulara
+app.post('/forms/create', (req,res)=>{
+    token = req.query.token;
+    if(tokens[token] == undefined){
+        res.status(400).send("Invalid token")
+        return
+    }
+    userID = tokens[token]["id"];
+    shelter = tokens[token]["shelter"];
+    dog_id = req.body.dog_id;
+    type = req.body.type;
+    details = req.body.details;
+    if(details == undefined || dog_id == undefined || type==undefined){
+        req.status(400).send("Bad params");
+    }
+    db.one("INSERT INTO forms(form_type,details,dog_id,user_id,created_at) VALUES ($1, $2, $3,$4, CURRENT_DATE) RETURNING ID", [type,details,dog_id,userID])
+    .then((data)=>{
+        //ak je to vencenie treba este sparovat termin s formularom
+        if(type==2){
+            term_id = req.body.term_id;
+            if(term_id == undefined){
+                db.any("DELETE FROM forms WHERE id=$1",[data.id])
+                .then((data)=>{
+                    res.status(400).send("Something went wrong");
+                })
+                .catch((error)=>{
+                    res.status(400).send("Something went wrong");
+                }) 
+            }
+            db.one("UPDATE terms SET ")
+        }
+        res.status(200).send("OK")
+    })
+    .catch((error)=>{
+        req.status(400).send("Something went wrong")
+    })
+})
+// editovanie formulara
+app.put('/forms/edit',(req,res)=>{
+    // TODO DAT DO FUNKCIE
+    token = req.query.token;
+    if(tokens[token] == undefined){
+        res.status(400).send("Invalid token");
+        return
+    }
+    formId = req.body.id;
+    details = req.body.details;
+    finished = req.body.finished;
+    db.one("UPDATE forms SET details = $1, finished = $2 WHERE id=$3 RETURNING id", [details,finished,formId])
+    .then((data)=>{
+        res.send("OK")
+    })
+    .catch((error)=>{
+        res.status(400).send("Bad request")
+    })
+})
+// vymazanie formulara
+app.delete('/forms/delete',(req,res)=>{
+    token = req.query.token;
+    formid = req.query.form_id
+    if(tokens[token] == undefined || formid == undefined){
+        res.status(400).send("Invalid token")
+        return
+    }
+    userID = tokens[token]["id"];
+    db.any("DELETE from forms WHERE user_id=$1 AND id=$2",[userID,formid])
+    .then((data)=>{
+        res.send("OK")
+    })
+    .catch((error)=>{
+        res.status(400).send("Bad request")
+    })
+})
+// vytvorenie terminov pre psa TODO DOROBIT
+app.post('/terms/create',(req,res)=>{
+    dog_id = req.query.dog_id
+    token = req.query.token
+    if(tokens[token] == undefined || dog_id == undefined){
+        req.status(400).send("Wrong parameters")
+        return;
+    }
+    //ziskam formulare pre psa
+    db.one("SELECT * from terms WHERE dog_id=$1 ORDER BY time DESC LIMIT 1",[dog_id])
+    .then((data) => {
+        time = data.time
+        return
+    })
+})
+// uprava terminu
+app.put('/terms/update',(req,res)=>{
+    token = req.query.token;
+    term_id = req.query.term_id;
+    if(tokens[token] == undefined || term_id == undefined){
+        req.status(400).send("Wrong parameters")
+        return;
+    }
+    free = req.body.free
+    user_id = tokens[token]["id"]
+    db.one("UPDATE terms SET free=$1 and user_id=$2 WHERE id=term_id RETURNING id",[free,user_id,term_id])
+    .then((data)=>{
+        res.send("OK")
+    })
+    .catch((error)=>{
+        res.status(400).send("Bad request")
+    })
+})
 
-
+// toto je tiez len taky test
 app.get('/users/:userID/', (req, res)=>{
   id = req.params["userID"];
   db.one("SELECT * FROM users WHERE users.id = $1",id).then((data)=>{
