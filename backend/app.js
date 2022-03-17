@@ -9,7 +9,8 @@ app.use(cors())
 const port = 8000
 
 //ulozene tokeny podla ID pouzivatela
-var tokens = {}
+var tokens = {"testToken":{id:8,shelter:true}}
+
 
 // aby som videl co mi psoiela user v request body
 app.use(express.json()) // for parsing application/json
@@ -40,6 +41,31 @@ function check_user(username,email){
 function check_token(token,request){
     
 }
+
+function test(){
+    t = new Date()
+    console.log(t)
+    db.one("SELECT time from terms WHERE dog_id=$1 ORDER BY time DESC LIMIT 1",[1])
+    .then((data) => {
+        console.log("Dobry den")
+        console.log(data)
+        time = data.time;
+        console.log(data.time)
+        console.log(typeof time)
+        today = new Date(data.time)
+        console.log(today.getDate())
+        t =JSON.stringify(time).substring(0,11)
+        console.log(t, typeof t)
+        console.log(JSON.stringify(time))
+    })
+    .catch((error)=>{
+        console.log("Dobry vecer")
+        time = undefined
+    })
+    
+}
+test()
+
 
 // ----------------------------
 //      SAMOTNE REQUESTY 
@@ -132,7 +158,13 @@ app.post('/forms/create', (req,res)=>{
                     res.status(400).send("Something went wrong");
                 }) 
             }
-            db.one("UPDATE terms SET ")
+            db.one("UPDATE terms SET form_id=$1 WHERE term_id=$2 RETURNING id",[data.id,term_id])
+            .then((data)=>{
+                res.send("OK")
+            })
+            .catch((error)=>{
+                res.status(400).send("Something went wrong")
+            })
         }
         res.status(200).send("OK")
     })
@@ -162,18 +194,18 @@ app.put('/forms/edit',(req,res)=>{
 // vymazanie formulara
 app.delete('/forms/delete',(req,res)=>{
     token = req.query.token;
-    formid = req.query.form_id
+    formid = req.query.form_id;
     if(tokens[token] == undefined || formid == undefined){
-        res.status(400).send("Invalid token")
+        res.status(400).send("Invalid token");
         return
     }
     userID = tokens[token]["id"];
     db.any("DELETE from forms WHERE user_id=$1 AND id=$2",[userID,formid])
     .then((data)=>{
-        res.send("OK")
+        res.send("OK");
     })
     .catch((error)=>{
-        res.status(400).send("Bad request")
+        res.status(400).send("Bad request");
     })
 })
 // vytvorenie terminov pre psa TODO DOROBIT
@@ -184,13 +216,36 @@ app.post('/terms/create',(req,res)=>{
         req.status(400).send("Wrong parameters")
         return;
     }
-    //ziskam formulare pre psa
-    db.one("SELECT * from terms WHERE dog_id=$1 ORDER BY time DESC LIMIT 1",[dog_id])
+    start_date = req.body.start_date
+    days = req.body.days
+    //ziskam posledny formular pre psa
+    var time = undefined
+    db.one("SELECT time from terms WHERE dog_id=$1 ORDER BY time DESC LIMIT 1",[dog_id])
     .then((data) => {
         time = data.time
-        return
+        insert_terms(dog_id,time)
     })
+    .catch((error)=>{
+        insert_terms(dog_id,new Date())
+    })
+    res.send("OK")
+    
+
 })
+function insert_terms(dog_id, time){
+    var today;
+    today = new Date(time)
+    var date = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
+    for(let i=1;i<=30;i++){
+        next_date = new Date();
+        next_date.setDate(today.getDate()+i)
+        date = next_date.getFullYear()+'-'+(next_date.getMonth()+1)+'-'+next_date.getDate();
+        db.none("INSERT INTO terms (free,dog_id,time) VALUES($1,$2,$3)", [true, dog_id, next_date])
+        console.log("New date ")
+        console.log(date)
+    }
+}
+
 // uprava terminu
 app.put('/terms/update',(req,res)=>{
     token = req.query.token;
