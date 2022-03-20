@@ -9,7 +9,7 @@ app.use(cors())
 const port = 8000
 
 //ulozene tokeny podla ID pouzivatela
-var tokens = {"testToken":{id:7,shelter:true}}
+var tokens = {"testToken":{id:1,shelter:true}}
 
 
 // aby som videl co mi psoiela user v request body
@@ -40,6 +40,13 @@ function check_user(username,email){
 
 function check_token(token,request){
     
+}
+
+//vrati true, ak je pouzivatel utulok, inak vrati false
+function check_role_of_user(username, email) {
+    db.one("SELCT * FROM users WHERE (users.username = $1 OR users.email = $2) AND users.utulok = true", [username, email])
+    .then((data) => {return true})
+    .catch((error) => {return false})
 }
 
 function test(){
@@ -129,6 +136,88 @@ app.post('/users/register',(req,res)=>{
         res.status(400).send({'message':'User already exists'});
     }
 })
+//nacitanie psov
+app.get('/dogs/getAll', (req, res) => {
+    token = req.query.token;
+    if(tokens[token] == undefined){
+        res.status(400).send("Invalid token");
+        return
+    }
+
+    username = req.query.username;
+    email = req.query.email;
+    id = req.query.id;
+    console.log(check_role_of_user(username, email))
+    if (check_role_of_user(username, email) == true) {  //pouzivatel je utulok
+        db.many("SELECT * FROM dogs WHERE utulok_id = $1", id)
+        .then((data) => {
+            dogs = []
+            for (i = 0; i < data.length; i++) {
+                dogs.push( {
+                    "id": data[i].id,
+                    "name": data[i].name,
+                    "image_location": data[i].image_location
+                });
+                console.log(dogs)
+                res.json(dogs)
+            }
+        })
+        .catch((error) => {
+            res.json(error)
+            res.status(400).json({'message': 'Wrong request'})
+        })
+    }
+    else { //pouzivatel je bezny
+        console.log("bezny")
+        db.many("SELECT * FROM dogs")
+        .then((data) => {
+            dogs = []
+            for (i = 0; i < data.length; i++) {
+                dogs.push( {
+                    "id": data[i].id,
+                    "name": data[i].name,
+                    "image_location": data[i].image_location
+                });
+                console.log(dogs)
+                res.json(dogs)
+            }
+        })
+        .catch((error) => {
+            res.json(error)
+            res.status(400).json({'message': 'Wrong request'})
+        })
+    }
+})
+
+//nacitanie detailu psa
+app.get('/dogs/getDog', (req, res) => {
+    token = req.query.token;
+    if(tokens[token] == undefined){
+        res.status(400).send("Invalid token");
+        return
+    }
+    dog_id = req.query.dog_id;
+    db.one('SELECT * FROM dogs WHERE dogs.id = $1', [dog_id])
+    .then((data) => {
+        dog_detail = {
+            "id": data.id,
+            "name": data.name,
+            "breed": data.breed,
+            "age": data.age,
+            "details": data.details,
+            "image_location": data.image_location,
+            "shelter_id": data.shelter_id,
+            "health": data.health
+        }
+        console.log(dog_detail)
+        res.json(dog_detail)
+    })
+    .catch((error)=>{
+        console.log(error)
+        res.status(400).json({'message':'Wrong request'})
+    })
+})
+
 // vytvorenie formulara
 app.post('/forms/create', (req,res)=>{
     token = req.query.token;
