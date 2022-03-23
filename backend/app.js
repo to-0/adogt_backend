@@ -474,6 +474,61 @@ app.put('/terms/update',(req,res)=>{
     })
 })
 
+//nacitanie obrazku psa
+app.get('/image', (req, res) => {
+    dog_id = req.query.dog_id;
+    if (!check_token_and_id(req.query.token, dog_id))
+        return
+
+    db.one('SELECT image_location::bytea FROM dogs WHERE dogs.id = $1', [dog_id])
+    .then((data) => {
+        console.log(data)
+        res.json(data)
+    })
+    .catch((error)=>{
+        console.log(error)
+        res.status(400).json({'message':'Wrong request'})
+    })
+})
+
+//nahratie obrazku psa
+app.put('/image/insert', (req, res) => {
+    token = req.query.token;
+    dog_id = req.query.dog_id;
+    if (!check_token_and_id(token, dog_id))
+        return
+
+    sql_function = `CREATE OR REPLACE FUNCTION bytea_import(p_path text, p_result OUT bytea)
+                    LANGUAGE plpgsql AS $$
+                    DECLARE 
+                        l_oid oid;
+                        r record;
+                    BEGIN
+                        p_result := '';
+                        SELECT lo_import(p_path) INTO l_oid;
+                        FOR r IN ( SELECT DATA
+                                FROM pg_largeobject
+                                WHERE loid = l_oid 
+                                ORDER BY pageno ) LOOP
+                            p_result = p_result || r.data;
+                        END LOOP;
+                        PERFORM lo_unlink(l_oid);
+                    END;$$;`
+
+    userID = tokens[token]["id"];
+    shelter = tokens[token]["shelter"];
+    image = req.body.image_location;
+    db.one("UPDATE dogs SET image_location = bytea_import($1) WHERE id = $2 RETURNING id", [image, dog_id])
+    .then((data) => {
+        console.log(data)
+        res.json(data)
+    })
+    .catch((error)=>{
+        console.log(error)
+        res.status(400).json({'message':'Wrong request'})
+    })
+})
+
 // toto je tiez len taky test
 app.get('/users/:userID/', (req, res)=>{
   id = req.params["userID"];
