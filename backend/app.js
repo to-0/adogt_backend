@@ -65,8 +65,11 @@ function test(){
     
 }
 test()
-
-
+app.get('/logout/',(req,res)=>{
+    token = req.query.token;
+    tokens[token] = undefined;
+    res.send("OK");
+})
 // ----------------------------
 //      SAMOTNE REQUESTY 
 // ----------------------------
@@ -142,17 +145,17 @@ app.post('/forms/create', (req,res)=>{
     type = req.body.type;
     details = req.body.details;
     if(details == undefined || dog_id == undefined || type==undefined){
-        req.status(400).send("Bad params");
+        res.status(400).send("Bad params");
     }
     db.one("INSERT INTO forms(form_type,details,dog_id,user_id,created_at) VALUES ($1, $2, $3,$4, CURRENT_DATE) RETURNING ID", [type,details,dog_id,userID])
     .then((data)=>{
-        //ak je to vencenie treba este sparovat termin s formularom
+        //ak je to vencenie treba este sparovat termin s formularom cize treba do req.body pridat term id
         if(type==2){
             term_id = req.body.term_id;
             if(term_id == undefined){
                 db.any("DELETE FROM forms WHERE id=$1",[data.id])
                 .then((data)=>{
-                    res.status(400).send("Something went wrong");
+                    res.status(400).send("Term id not given");
                 })
                 .catch((error)=>{
                     res.status(400).send("Something went wrong");
@@ -169,7 +172,7 @@ app.post('/forms/create', (req,res)=>{
         res.status(200).send("OK")
     })
     .catch((error)=>{
-        req.status(400).send("Something went wrong")
+        res.status(400).send("Something went wrong")
     })
 })
 //načítanie detailu formulára
@@ -204,6 +207,7 @@ app.get('/forms/getAll',(req,res)=>{
     }
     db.many("SELECT * FROM forms WHERE user_id=$1 ORDER BY id",[tokens[token]["id"]])
     .then((data)=>{
+        console.log(data)
         forms = []
         for(var i=0; i<data.length;i++){
             forms.push( {
@@ -244,6 +248,8 @@ app.put('/forms/edit',(req,res)=>{
 app.delete('/forms/delete',(req,res)=>{
     token = req.query.token;
     formid = req.query.form_id;
+    console.log(token);
+    console.log(formid)
     if(tokens[token] == undefined || formid == undefined){
         res.status(400).send("Invalid token");
         return
@@ -296,7 +302,7 @@ function insert_terms(dog_id, time){
 }
 
 // uprava terminu
-app.put('/terms/update',(req,res)=>{
+app.put('/terms/editTerm',(req,res)=>{
     token = req.query.token;
     term_id = req.query.term_id;
     if(tokens[token] == undefined || term_id == undefined){
@@ -305,7 +311,8 @@ app.put('/terms/update',(req,res)=>{
     }
     free = req.body.free
     user_id = tokens[token]["id"]
-    db.one("UPDATE terms SET free=$1 and user_id=$2 WHERE id=term_id RETURNING id",[free,user_id,term_id])
+    console.log(free,user_id,term_id);
+    db.one("UPDATE terms SET free=$1, user_id=$2 WHERE id=$3 RETURNING id",[free,user_id,term_id])
     .then((data)=>{
         res.send("OK")
     })
