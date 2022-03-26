@@ -446,7 +446,7 @@ function insert_terms(dog_id, time){
     var today;
     today = new Date(time)
     var date = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
-    for(let i=1;i<=30;i++){
+    for(let i=1;i<=3;i++){
         next_date = new Date();
         next_date.setDate(today.getDate()+i)
         date = next_date.getFullYear()+'-'+(next_date.getMonth()+1)+'-'+next_date.getDate();
@@ -527,6 +527,15 @@ app.put('/image/insert', (req, res) => {
         console.log(error)
         res.status(400).json({'message':'Wrong request'})
     })
+})
+app.get('/logout/',(req,res)=>{
+    token = req.query.token;
+    if(check_token(token)){
+        tokens[token] = undefined;
+        res.send("Logout successfull");
+    }
+    res.send("Invalid token");
+    
 })
 
 // toto je tiez len taky test
