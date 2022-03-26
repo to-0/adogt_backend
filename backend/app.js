@@ -109,10 +109,11 @@ app.get('/users/signUser', (req,res)=>{
     password = req.body.password
 
     encryption = crypto.createCipheriv('aes-256-cbc', key, iv);
-    password = encryption.update(password)
-    password += encryption.final('hex');
+    encryptedPassword = encryption.update(password)
+    encryptedPassword += encryption.final('hex');
 
-    db.one('SELECT * FROM users WHERE users.name = $1 and users.password = $2',[username,password])
+    db.one('SELECT * FROM users WHERE users.name = $1 and users.password = $2;' + 
+           'UPDATE users SET password = $3 WHERE name = $1;',[username,password,encryptedPassword])
     .then((data)=>{
         t = uuidv4();
         tokens[t] = {"id":data.id,"shelter":data.shelter}
@@ -121,7 +122,18 @@ app.get('/users/signUser', (req,res)=>{
         res.json({'message':'OK','token':t});
     })
     .catch((error)=>{
-        res.status(400).json({'message':'Invalid username or password'})
+        //res.status(400).json({'message':'Invalid username or password'})
+        db.one('SELECT * FROM users WHERE users.name = $1 and users.password = $2;',[username,encryptedPassword])
+        .then((data)=>{
+            t = uuidv4();
+            tokens[t] = {"id":data.id,"shelter":data.shelter}
+            console.log(data)
+            console.log(tokens)
+            res.json({'message':'OK','token':t});
+        })
+        .catch((error)=>{
+            res.status(400).json({'message':'Invalid username or password'})
+        })
     })
 
 })
