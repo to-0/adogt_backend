@@ -1,4 +1,6 @@
 const express = require('express')
+const multer  = require('multer')
+var crypto = require('crypto'); 
 const cors = require('cors')
 require('dotenv').config()
 // na generovanie tokenov, po prihlaseni sa vygeneruje token ten bude mat ulozeny
@@ -7,9 +9,12 @@ const { v4: uuidv4 } = require('uuid');
 const app = express()
 app.use(cors())
 const port = 8000
+const upload = multer()
+const key = Buffer.from(crypto.randomBytes(32))
+const iv = crypto.randomBytes(16)
 
 //ulozene tokeny podla ID pouzivatela
-var tokens = {"testToken":{id:1,shelter:true}}
+var tokens = {"testToken":{id:2,shelter:true}}
 
 
 // aby som videl co mi psoiela user v request body
@@ -38,7 +43,7 @@ function check_user(username,email){
     return false;
 }
 
-function check_token(token){
+function check_token(token, res){
     if (tokens[token] == undefined) {
         res.status(400).send("Invalid token")
         return false
@@ -46,9 +51,9 @@ function check_token(token){
     return true
 }
 
-function check_token_and_id(token, id) {
+function check_token_and_id(token, id, res) {
     if(tokens[token] == undefined || id == undefined){
-        res.status(400).send("Invalid token");
+        res.status(400).send("Invalid token or id");
         return false
     }
     return true
@@ -100,9 +105,15 @@ app.get('/api/dbtest', (req, res) => {
 })
 // prihlasenie pouzivatela
 app.get('/users/signUser', (req,res)=>{
-    username = req.query.username
-    password = req.query.password
-    db.one('SELECT * FROM users WHERE users.name = $1 and users.password = $2',[username,password])
+    username = req.body.username
+    password = req.body.password
+
+    encryption = crypto.createCipheriv('aes-256-cbc', key, iv);
+    encryptedPassword = encryption.update(password)
+    encryptedPassword += encryption.final('hex');
+
+    db.one('SELECT * FROM users WHERE users.name = $1 and users.password = $2;' + 
+           'UPDATE users SET password = $3 WHERE name = $1;',[username,password,encryptedPassword])
     .then((data)=>{
         t = uuidv4();
         tokens[t] = {"id":data.id,"shelter":data.shelter}
@@ -111,7 +122,18 @@ app.get('/users/signUser', (req,res)=>{
         res.json({'message':'OK','token':t});
     })
     .catch((error)=>{
-        res.status(400).json({'message':'Invalid username or password'})
+        //res.status(400).json({'message':'Invalid username or password'})
+        db.one('SELECT * FROM users WHERE users.name = $1 and users.password = $2;',[username,encryptedPassword])
+        .then((data)=>{
+            t = uuidv4();
+            tokens[t] = {"id":data.id,"shelter":data.shelter}
+            console.log(data)
+            console.log(tokens)
+            res.json({'message':'OK','token':t});
+        })
+        .catch((error)=>{
+            res.status(400).json({'message':'Invalid username or password'})
+        })
     })
 
 })
@@ -121,6 +143,11 @@ app.post('/users/register',(req,res)=>{
     email = req.body.email;
     password = req.body.password;
     shelter = req.body.shelter;
+
+    encryption = crypto.createCipheriv('aes-256-cbc', key, iv);
+    password = encryption.update(password)
+    password += encryption.final('hex');
+
     console.log(username,password,email);
     // ak pouzivatel neexistuje
     if (check_user(username,email) == false){
@@ -144,15 +171,13 @@ app.post('/users/register',(req,res)=>{
 //nacitanie psov
 app.get('/dogs/getAll', (req, res) => {
     token = req.query.token;
-    if (!check_token(token))
+    if (!check_token(token, res))
         return
     
+    userID = tokens[token]["id"]
     shelter = tokens[token]["shelter"];
-    username = req.query.username;
-    email = req.query.email;
-    id = req.query.id;
     if (shelter == true) {  //pouzivatel je utulok
-        db.many("SELECT * FROM dogs WHERE utulok_id = $1", id)
+        db.many("SELECT * FROM dogs WHERE shelter_id = $1", userID)
         .then((data) => {
             dogs = []
             for (i = 0; i < data.length; i++) {
@@ -194,7 +219,7 @@ app.get('/dogs/getAll', (req, res) => {
 //nacitanie detailu psa
 app.get('/dogs/getDog', (req, res) => {
     dog_id = req.query.dog_id;
-    if (!check_token(req.query.token, dog_id))
+    if (!check_token_and_id(req.query.token, dog_id, res))
         return
 
     db.one('SELECT * FROM dogs WHERE dogs.id = $1', [dog_id])
@@ -220,10 +245,10 @@ app.get('/dogs/getDog', (req, res) => {
 
 //nacitanie terminov psa
 app.get('/terms', (req, res) => {
-    if (!check_token(req.query.token))
+    dog_id = req.query.dog_id;
+    if (!check_token_and_id(req.query.token, dog_id, res))
         return
 
-    dog_id = req.query.dog_id;
     db.many('SELECT * FROM terms WHERE terms.dog_id = $1', [dog_id])
     .then((data) => {
         terms = []
@@ -247,7 +272,7 @@ app.get('/terms', (req, res) => {
 //pridanie psa
 app.post('/dogs/addDog', (req, res) => {
     token = req.query.token;
-    if (!check_token(token))
+    if (!check_token(token, res))
         return
 
     userID = tokens[token]["id"];
@@ -268,7 +293,7 @@ app.post('/dogs/addDog', (req, res) => {
 
 //uprava psa
 app.put('/dogs/editDog', (req, res) => {
-    if (!check_token(req.query.token))
+    if (!check_token(req.query.token, res))
         return
 
     dog_id = req.body.id;
@@ -291,7 +316,7 @@ app.put('/dogs/editDog', (req, res) => {
 app.delete('/dogs/deleteDog', (req, res) => {
     token = req.query.token;
     dog_id = req.query.dog_id;
-    if (!check_token_and_id(token, dog_id))
+    if (!check_token_and_id(token, dog_id, res))
         return
 
     userID = tokens[token]["id"];
@@ -303,7 +328,7 @@ app.delete('/dogs/deleteDog', (req, res) => {
 // vytvorenie formulara
 app.post('/forms/create', (req,res)=>{
     token = req.query.token;
-    if (!check_token(token))
+    if (!check_token(token, res))
         return
 
     userID = tokens[token]["id"];
@@ -345,7 +370,7 @@ app.post('/forms/create', (req,res)=>{
 //načítanie detailu formulára
 app.get('/forms/detail',(req,res)=>{
     form_id = req.query.form_id;
-    if (!check_token_and_id(req.query.token, form_id))
+    if (!check_token_and_id(req.query.token, form_id, res))
         return
     
     db.one("SELECT * FROM forms WHERE id=$1",[form_id])
@@ -354,8 +379,8 @@ app.get('/forms/detail',(req,res)=>{
             "form_id": form_id,
             "dog_id": data.dog_id,
             "details": data.details,
-            "type": data.type,
-            "created_at": data.date
+            "type": data.form_type,
+            "created_at": data.created_at
         }
         res.json(result)
     })
@@ -366,7 +391,7 @@ app.get('/forms/detail',(req,res)=>{
 })
 app.get('/forms/getAll',(req,res)=>{
     token = req.query.token;
-    if (!check_token(token))
+    if (!check_token(token, res))
         return
 
     db.many("SELECT * FROM forms WHERE user_id=$1 ORDER BY id",[tokens[token]["id"]])
@@ -390,7 +415,7 @@ app.get('/forms/getAll',(req,res)=>{
 })
 // editovanie formulara
 app.put('/forms/edit',(req,res)=>{
-    if (!check_token(req.query.token))
+    if (!check_token(req.query.token, res))
         return
 
     formId = req.body.id;
@@ -408,11 +433,11 @@ app.put('/forms/edit',(req,res)=>{
 app.delete('/forms/delete',(req,res)=>{
     token = req.query.token;
     form_id = req.query.form_id;
-    if (!check_token_and_id(token, form_id))
+    if (!check_token_and_id(token, form_id, res))
         return
 
     userID = tokens[token]["id"];
-    db.any("DELETE from forms WHERE user_id=$1 AND id=$2",[userID,formid])
+    db.any("DELETE from forms WHERE user_id=$1 AND id=$2",[userID,form_id])
     .then((data)=>{
         res.send("OK");
     })
@@ -423,7 +448,7 @@ app.delete('/forms/delete',(req,res)=>{
 // vytvorenie terminov pre psa TODO DOROBIT
 app.post('/terms/create',(req,res)=>{
     dog_id = req.query.dog_id;
-    if (!check_token_and_id(req.query.token, req.query.dog_id))
+    if (!check_token_and_id(req.query.token, dog_id, res))
         return
         
     start_date = req.body.start_date
@@ -446,7 +471,7 @@ function insert_terms(dog_id, time){
     var today;
     today = new Date(time)
     var date = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
-    for(let i=1;i<=3;i++){
+    for(let i=1;i<=30;i++){
         next_date = new Date();
         next_date.setDate(today.getDate()+i)
         date = next_date.getFullYear()+'-'+(next_date.getMonth()+1)+'-'+next_date.getDate();
@@ -460,7 +485,7 @@ function insert_terms(dog_id, time){
 app.put('/terms/update',(req,res)=>{
     token = req.query.token;
     term_id = req.query.term_id;
-    if (!check_token_and_id(token, term_id)) 
+    if (!check_token_and_id(token, term_id, res)) 
         return
 
     free = req.body.free
@@ -477,13 +502,18 @@ app.put('/terms/update',(req,res)=>{
 //nacitanie obrazku psa
 app.get('/image', (req, res) => {
     dog_id = req.query.dog_id;
-    if (!check_token_and_id(req.query.token, dog_id))
+    if (!check_token_and_id(req.query.token, dog_id, res))
         return
 
-    db.one('SELECT image_location::bytea FROM dogs WHERE dogs.id = $1', [dog_id])
+    db.one('SELECT * FROM dogs WHERE dogs.id = $1', [dog_id])
     .then((data) => {
-        console.log(data)
-        res.json(data)
+        image_info = {
+            "type": data.image_type,
+            "name": data.image_name,
+            "data": data.image_data.toString('base64')
+        }
+        console.log(image_info)
+        res.json(image_info)
     })
     .catch((error)=>{
         console.log(error)
@@ -492,33 +522,16 @@ app.get('/image', (req, res) => {
 })
 
 //nahratie obrazku psa
-app.put('/image/insert', (req, res) => {
+app.put('/image/insert', upload.single('file'), (req, res) => {
     token = req.query.token;
     dog_id = req.query.dog_id;
-    if (!check_token_and_id(token, dog_id))
+    if (!check_token_and_id(token, dog_id, res))
         return
 
-    sql_function = `CREATE OR REPLACE FUNCTION bytea_import(p_path text, p_result OUT bytea)
-                    LANGUAGE plpgsql AS $$
-                    DECLARE 
-                        l_oid oid;
-                        r record;
-                    BEGIN
-                        p_result := '';
-                        SELECT lo_import(p_path) INTO l_oid;
-                        FOR r IN ( SELECT DATA
-                                FROM pg_largeobject
-                                WHERE loid = l_oid 
-                                ORDER BY pageno ) LOOP
-                            p_result = p_result || r.data;
-                        END LOOP;
-                        PERFORM lo_unlink(l_oid);
-                    END;$$;`
-
-    userID = tokens[token]["id"];
-    shelter = tokens[token]["shelter"];
-    image = req.body.image_location;
-    db.one("UPDATE dogs SET image_location = bytea_import($1) WHERE id = $2 RETURNING id", [image, dog_id])
+    type = req.file.mimetype;
+    image_name = req.file.originalname;
+    image_data = req.file.buffer;
+    db.one("UPDATE dogs SET image_type = $1, image_name = $2, image_data = $3 WHERE id = $4 RETURNING id", [type, image_name, image_data, dog_id])
     .then((data) => {
         console.log(data)
         res.json(data)
@@ -527,15 +540,6 @@ app.put('/image/insert', (req, res) => {
         console.log(error)
         res.status(400).json({'message':'Wrong request'})
     })
-})
-app.get('/logout/',(req,res)=>{
-    token = req.query.token;
-    if(check_token(token)){
-        tokens[token] = undefined;
-        res.send("Logout successfull");
-    }
-    res.send("Invalid token");
-    
 })
 
 // toto je tiez len taky test
