@@ -105,8 +105,8 @@ app.get('/api/dbtest', (req, res) => {
 })
 // prihlasenie pouzivatela
 app.get('/users/signUser', (req,res)=>{
-    username = req.body.username
-    password = req.body.password
+    username = req.query.username
+    password = req.query.password
 
     encryption = crypto.createCipheriv('aes-256-cbc', key, iv);
     encryptedPassword = encryption.update(password)
