@@ -14,7 +14,7 @@ const key = Buffer.from(crypto.randomBytes(32))
 const iv = crypto.randomBytes(16)
 
 //ulozene tokeny podla ID pouzivatela
-var tokens = {"testToken":{id:2,shelter:true}}
+var tokens = {"testToken":{id:2,shelter:false}}
 
 
 // aby som videl co mi psoiela user v request body
@@ -81,7 +81,6 @@ function test(){
     })
     
 }
-test()
 
 
 // ----------------------------
@@ -105,9 +104,9 @@ app.get('/api/dbtest', (req, res) => {
 })
 // prihlasenie pouzivatela
 app.get('/users/signUser', (req,res)=>{
-    username = req.body.username
-    password = req.body.password
-
+    username = req.query.username
+    password = req.query.password
+    console.log(username, password)
     encryption = crypto.createCipheriv('aes-256-cbc', key, iv);
     encryptedPassword = encryption.update(password)
     encryptedPassword += encryption.final('hex');
@@ -161,6 +160,7 @@ app.post('/users/register',(req,res)=>{
             res.json({'message':'OK','token':t});
         })
         .catch((error)=>{
+            console.log(error)
             res.status(400).json({'message':'Fail'});
         })
     }
@@ -184,6 +184,8 @@ app.get('/dogs/getAll', (req, res) => {
                 dogs.push( {
                     "id": data[i].id,
                     "name": data[i].name,
+                    "age": data[i].age,
+                    "breed": data[i].breed,
                     "image_location": data[i].image_location
                 });
             }
@@ -203,6 +205,8 @@ app.get('/dogs/getAll', (req, res) => {
                 dogs.push( {
                     "id": data[i].id,
                     "name": data[i].name,
+                    "age": data[i].age,
+                    "breed": data[i].breed,
                     "image_location": data[i].image_location
                 });
             }
