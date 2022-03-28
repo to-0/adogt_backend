@@ -14,7 +14,7 @@ const key = Buffer.from(crypto.randomBytes(32))
 const iv = crypto.randomBytes(16)
 
 //ulozene tokeny podla ID pouzivatela
-var tokens = {"testToken":{id:2,shelter:false}}
+var tokens = {"testToken":{id:7,shelter:true}}
 
 
 // aby som videl co mi psoiela user v request body
@@ -286,11 +286,12 @@ app.post('/dogs/addDog', (req, res) => {
     age = req.body.age;
     health = req.body.health;
     details = req.body.details;
-    photo = req.body.photo;
-    if (dog_name == undefined || breed == undefined || age == undefined || details == undefined || photo == undefined || health == undefined)
+    //photo = req.body.photo;
+    if (dog_name == undefined || breed == undefined || age == undefined || details == undefined || health == undefined)
         res.status(400).send("Bad params");
 
-    db.one("INSERT INTO dogs (name, breed, age, details, image_location, shelter_id, health) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ID", [dog_name, breed, age, details, photo, userID, health])
+    //db.one("INSERT INTO dogs (name, breed, age, details, image_location, shelter_id, health) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ID", [dog_name, breed, age, details, photo, userID, health])
+    db.one("INSERT INTO dogs (name, breed, age, details, shelter_id, health) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID", [dog_name, breed, age, details, userID, health])
     .then((data) => res.status(200).send("OK"))
     .catch((error)=> res.status(400).send("Something went wrong"))
 })
@@ -299,19 +300,21 @@ app.post('/dogs/addDog', (req, res) => {
 app.put('/dogs/editDog', (req, res) => {
     if (!check_token(req.query.token, res))
         return
-
-    dog_id = req.body.id;
+    token = req.query.token;
+    dog_id = req.query.dog_id;
     dog_name = req.body.name;
     breed = req.body.breed;
     age = req.body.age;
     health = req.body.health;
     details = req.body.details;
-    photo = req.body.photo;
-    if (dog_name == undefined || breed == undefined || age == undefined || details == undefined || photo == undefined || health == undefined || dog_id == undefined)
-        res.status(400).send("Bad params");
+    shelter = tokens[token]["shelter"];
+    userID = tokens[token]["id"];
+    //photo = req.body.photo;
+    if (dog_name == undefined || breed == undefined || age == undefined || details == undefined || health == undefined || dog_id == undefined || shelter == false)
+        res.status(400).send("Bad params or user is not shelter");
 
-    db.one("UPDATE dogs SET name = $1, breed = $2, age = $3, details = $4, image_location = $5, health = $6  WHERE id = $7 RETURNING id", 
-        [dog_name, breed, age, details, photo, health, dog_id])
+    db.one("UPDATE dogs SET name = $1, breed = $2, age = $3, details = $4, health = $5  WHERE id = $6 and shelter_id=$7 RETURNING id", 
+        [dog_name, breed, age, details, health, dog_id,userID])
     .then((data) => res.send("OK"))
     .catch((error)=> res.status(400).send("Bad request"))
 })
@@ -414,7 +417,7 @@ app.get('/forms/getAll',(req,res)=>{
     })
     .catch((error)=>{
         console.log(error)
-        res.status(400).send("Wrong request")
+        res.status(400).send("No forms for this user")
     })
 })
 // editovanie formulara
@@ -475,7 +478,7 @@ function insert_terms(dog_id, time){
     var today;
     today = new Date(time)
     var date = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
-    for(let i=1;i<=30;i++){
+    for(let i=1;i<=3;i++){
         next_date = new Date();
         next_date.setDate(today.getDate()+i)
         date = next_date.getFullYear()+'-'+(next_date.getMonth()+1)+'-'+next_date.getDate();
@@ -494,7 +497,8 @@ app.put('/terms/update',(req,res)=>{
 
     free = req.body.free
     user_id = tokens[token]["id"]
-    db.one("UPDATE terms SET free=$1 and user_id=$2 WHERE id=$3 RETURNING id",[free,user_id,term_id])
+    console.log(user_id)
+    db.one("UPDATE terms SET free=$1, user_id=$2 WHERE id=$3 RETURNING id",[free,user_id,term_id])
     .then((data)=>{
         res.send("OK")
     })
@@ -546,16 +550,6 @@ app.put('/image/insert', upload.single('file'), (req, res) => {
     })
 })
 
-// toto je tiez len taky test
-app.get('/users/:userID/', (req, res)=>{
-  id = req.params["userID"];
-  db.one("SELECT * FROM users WHERE users.id = $1",id).then((data)=>{
-    res.json(data);
-  })
-  .catch((error)=>{
-    console.log(error);
-  })
-})
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`)
 })
