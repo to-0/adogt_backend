@@ -14,7 +14,7 @@ const key = Buffer.from(crypto.randomBytes(32))
 const iv = crypto.randomBytes(16)
 
 //ulozene tokeny podla ID pouzivatela
-var tokens = {"testToken":{id:7,shelter:true}}
+var tokens = {"testToken":{id:6,shelter:true}}
 
 
 // aby som videl co mi psoiela user v request body
@@ -111,9 +111,9 @@ app.get('/users/signUser', (req,res)=>{
     encryptedPassword = encryption.update(password)
     encryptedPassword += encryption.final('hex');
 
-    db.one('SELECT * FROM users WHERE users.name = $1 and users.password = $2;' + 
-           'UPDATE users SET password = $3 WHERE name = $1;',[username,password,encryptedPassword])
+    db.one('SELECT * FROM users WHERE users.name = $1 and users.password = $2;',[username,password])
     .then((data)=>{
+        data.none('UPDATE users SET password = $2 WHERE name = $1;'[username, encryptedPassword]);
         t = uuidv4();
         tokens[t] = {"id":data.id,"shelter":data.shelter}
         console.log(data)
@@ -121,7 +121,6 @@ app.get('/users/signUser', (req,res)=>{
         res.json({'message':'OK','token':t});
     })
     .catch((error)=>{
-        //res.status(400).json({'message':'Invalid username or password'})
         db.one('SELECT * FROM users WHERE users.name = $1 and users.password = $2;',[username,encryptedPassword])
         .then((data)=>{
             t = uuidv4();
@@ -222,62 +221,111 @@ app.get('/dogs/getAll', (req, res) => {
 
 //nacitanie detailu psa
 app.get('/dogs/getDog', (req, res) => {
+    token = req.query.token;
     dog_id = req.query.dog_id;
-    if (!check_token_and_id(req.query.token, dog_id, res))
-        return
+    if (!check_token_and_id(token, dog_id, res))
+        return;
 
-    db.one('SELECT * FROM dogs WHERE dogs.id = $1', [dog_id])
-    .then((data) => {
-        dog_detail = {
-            "id": data.id,
-            "name": data.name,
-            "breed": data.breed,
-            "age": data.age,
-            "details": data.details,
-            "image_location": data.image_location,
-            "shelter_id": data.shelter_id,
-            "health": data.health
-        }
-        console.log(dog_detail)
-        res.json(dog_detail)
-    })
-    .catch((error)=>{
-        console.log(error)
-        res.status(400).json({'message':'Wrong request'})
-    })
+    userID = tokens[token]["id"];
+    shelter = tokens[token]["shelter"];
+    if (shelter == true) {
+        db.one('SELECT * FROM dogs WHERE dogs.id = $1 AND dogs.shelter_id = $2', [dog_id, userID])
+        .then((data) => {
+            dog_detail = {
+                "id": data.id,
+                "name": data.name,
+                "breed": data.breed,
+                "age": data.age,
+                "details": data.details,
+                "shelter_id": data.shelter_id,
+                "health": data.health
+            }
+            console.log(dog_detail)
+            res.json(dog_detail)
+        })
+        .catch((error)=>{
+            console.log(error)
+            res.status(400).json({'message':'Wrong request'})
+        })
+    }
+    else {
+        db.one('SELECT * FROM dogs WHERE dogs.id = $1', [dog_id])
+        .then((data) => {
+            dog_detail = {
+                "id": data.id,
+                "name": data.name,
+                "breed": data.breed,
+                "age": data.age,
+                "details": data.details,
+                "shelter_id": data.shelter_id,
+                "health": data.health
+            }
+            console.log(dog_detail)
+            res.json(dog_detail)
+        })
+        .catch((error)=>{
+            console.log(error)
+            res.status(400).json({'message':'Wrong request'})
+        })
+    }
 })
 
 //nacitanie terminov psa
 app.get('/terms', (req, res) => {
+    token = req.query.token;
     dog_id = req.query.dog_id;
     if (!check_token_and_id(req.query.token, dog_id, res))
-        return
-
-    db.many('SELECT * FROM terms WHERE terms.dog_id = $1', [dog_id])
-    .then((data) => {
-        terms = []
-        for (i = 0; i < data.length; i++) {
-            terms.push( {
-                "id": data[i].id,
-                "date": data[i].time,
-                "free": data[i].free
-            });
+        return;
+    
+    userID = tokens[token]["id"];
+    shelter = tokens[token]["shelter"];
+    if (shelter == true) {
+        db.many('SELECT * FROM terms WHERE terms.dog_id = $1 AND terms.dog_id IN (SELECT dogs.id FROM dogs WHERE shelter_id = $2)', [dog_id, userID])
+        .then((data) => {
+            terms = []
+            for (i = 0; i < data.length; i++) {
+                terms.push( {
+                    "id": data[i].id,
+                    "date": data[i].time,
+                    "free": data[i].free
+                });
+                console.log(terms)
+            }
             console.log(terms)
-        }
-        console.log(terms)
-        res.json(terms)
-    })
-    .catch((error) => {
-        console.log(error)
-        res.status(400).json({'message':'Wrong request'})
-    })
+            res.json(terms)
+        })
+        .catch((error) => {
+            console.log(error)
+            res.status(400).json({'message':'Wrong request'})
+        })
+    }
+    else {
+        db.many('SELECT * FROM terms WHERE terms.dog_id = $1', [dog_id])
+        .then((data) => {
+            terms = []
+            for (i = 0; i < data.length; i++) {
+                terms.push( {
+                    "id": data[i].id,
+                    "date": data[i].time,
+                    "free": data[i].free
+                });
+                console.log(terms)
+            }
+            console.log(terms)
+            res.json(terms)
+        })
+        .catch((error) => {
+            console.log(error)
+            res.status(400).json({'message':'Wrong request'})
+        })
+    }
 })
 
 //pridanie psa
 app.post('/dogs/addDog', (req, res) => {
     token = req.query.token;
     if (!check_token(token, res))
-        return
+        return;
 
     userID = tokens[token]["id"];
     shelter = tokens[token]["shelter"];
@@ -287,8 +335,10 @@ app.post('/dogs/addDog', (req, res) => {
     health = req.body.health;
     details = req.body.details;
     //photo = req.body.photo;
-    if (dog_name == undefined || breed == undefined || age == undefined || details == undefined || health == undefined)
+    if (dog_name == undefined || breed == undefined || age == undefined || details == undefined || health == undefined || shelter == false) {
         res.status(400).send("Bad params");
+        return;
+    }
 
     //db.one("INSERT INTO dogs (name, breed, age, details, image_location, shelter_id, health) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ID", [dog_name, breed, age, details, photo, userID, health])
     db.one("INSERT INTO dogs (name, breed, age, details, shelter_id, health) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID", [dog_name, breed, age, details, userID, health])
@@ -299,7 +349,8 @@ app.post('/dogs/addDog', (req, res) => {
 //uprava psa
 app.put('/dogs/editDog', (req, res) => {
     if (!check_token(req.query.token, res))
-        return
+        return;
+
     token = req.query.token;
     dog_id = req.query.dog_id;
     dog_name = req.body.name;
@@ -309,9 +360,10 @@ app.put('/dogs/editDog', (req, res) => {
     details = req.body.details;
     shelter = tokens[token]["shelter"];
     userID = tokens[token]["id"];
-    //photo = req.body.photo;
-    if (dog_name == undefined || breed == undefined || age == undefined || details == undefined || health == undefined || dog_id == undefined || shelter == false)
-        res.status(400).send("Bad params or user is not shelter");
+    if (dog_name == undefined || breed == undefined || age == undefined || details == undefined || health == undefined || dog_id == undefined || shelter == false) {
+        res.status(400).send("Bad params or user is not a shelter");
+        return;
+    }
 
     db.one("UPDATE dogs SET name = $1, breed = $2, age = $3, details = $4, health = $5  WHERE id = $6 and shelter_id=$7 RETURNING id", 
         [dog_name, breed, age, details, health, dog_id,userID])
@@ -327,9 +379,13 @@ app.delete('/dogs/deleteDog', (req, res) => {
         return
 
     userID = tokens[token]["id"];
-    db.any("DELETE from dogs WHERE shelter_id = $1 AND id = $2", [userID, dog_id])
-    .then((data) => res.send("OK"))
-    .catch((error) => res.status(400).send("Bad request"))
+    db.any("DELETE FROM dogs WHERE dogs.shelter_id = $1 AND dogs.id = $2;", [userID, dog_id])
+    .then((data) => {
+        db.any("DELETE FROM terms WHERE terms.dog_id = $2; DELETE FROM forms WHERE forms.dog_id = $2", [userID, dog_id])
+        .then((data) => res.send("OK"))
+        .catch((error) => res.status(400).send("Bad request"))
+    })
+    .catch((error) => res.status(400).send("Bad request this"))
 })
 
 // vytvorenie formulara
@@ -343,9 +399,11 @@ app.post('/forms/create', (req,res)=>{
     dog_id = req.body.dog_id;
     type = req.body.type;
     details = req.body.details;
-    if(details == undefined || dog_id == undefined || type==undefined){
+    if(details == undefined || dog_id == undefined || type==undefined || shelter == true){
         res.status(400).send("Bad params");
+        return;
     }
+
     db.one("INSERT INTO forms(form_type,details,dog_id,user_id,created_at) VALUES ($1, $2, $3,$4, CURRENT_DATE) RETURNING ID", [type,details,dog_id,userID])
     .then((data)=>{
         //ak je to vencenie treba este sparovat termin s formularom
@@ -360,7 +418,7 @@ app.post('/forms/create', (req,res)=>{
                     res.status(400).send("Something went wrong");
                 }) 
             }
-            db.one("UPDATE terms SET form_id=$1 WHERE term_id=$2 RETURNING id",[data.id,term_id])
+            db.one("UPDATE terms SET form_id=$1 WHERE terms.id=$2 RETURNING id",[data.id,term_id])
             .then((data)=>{
                 res.send("OK")
             })
@@ -377,10 +435,12 @@ app.post('/forms/create', (req,res)=>{
 //načítanie detailu formulára
 app.get('/forms/detail',(req,res)=>{
     form_id = req.query.form_id;
-    if (!check_token_and_id(req.query.token, form_id, res))
-        return
+    token = req.query.token;
+    if (!check_token_and_id(token, form_id, res))
+        return;
     
-    db.one("SELECT * FROM forms WHERE id=$1",[form_id])
+    userID = tokens[token]["id"];
+    db.one("SELECT * FROM forms WHERE id=$1 AND (forms.user_id=$2 OR forms.dog_id IN (SELECT dogs.id FROM dogs WHERE shelter_id = $2))",[form_id, userID])
     .then((data)=>{
         result = {
             "form_id": form_id,
@@ -401,7 +461,7 @@ app.get('/forms/getAll',(req,res)=>{
     if (!check_token(token, res))
         return
 
-    db.many("SELECT * FROM forms WHERE user_id=$1 ORDER BY id",[tokens[token]["id"]])
+    db.any("SELECT * FROM forms WHERE user_id=$1 OR forms.dog_id IN (SELECT dogs.id FROM dogs WHERE shelter_id = $1) ORDER BY id",[tokens[token]["id"]])
     .then((data)=>{
         forms = []
         for(var i=0; i<data.length;i++){
@@ -422,13 +482,20 @@ app.get('/forms/getAll',(req,res)=>{
 })
 // editovanie formulara
 app.put('/forms/edit',(req,res)=>{
-    if (!check_token(req.query.token, res))
-        return
+    token = req.query.token;
+    if (!check_token(token, res))
+        return;
 
-    formId = req.body.id;
+    userID = tokens[token]["id"]; 
+    formId = req.query.form_id;
     details = req.body.details;
     finished = req.body.finished;
-    db.one("UPDATE forms SET details = $1, finished = $2 WHERE id=$3 RETURNING id", [details,finished,formId])
+    if (formId == undefined || details == undefined || finished == undefined) {
+        res.status(400).send("Bad params");
+        return;
+    }
+
+    db.one("UPDATE forms SET details = $1, finished = $2 WHERE id=$3 AND user_id = $4 RETURNING id", [details,finished,formId, userID])
     .then((data)=>{
         res.send("OK")
     })
@@ -444,25 +511,33 @@ app.delete('/forms/delete',(req,res)=>{
         return
 
     userID = tokens[token]["id"];
-    db.any("DELETE from forms WHERE user_id=$1 AND id=$2",[userID,form_id])
+    db.one("DELETE from forms WHERE id=$2 AND (forms.user_id=$1 OR forms.dog_id IN (SELECT dogs.id FROM dogs WHERE shelter_id = $1)) RETURNING dog_id",[userID,form_id])
     .then((data)=>{
-        res.send("OK");
+        db.any("DELETE FROM terms WHERE dog_id = $1 and form_id = $2", [data.dog_id, form_id])
+        .then((data) => res.send("OK"))
+        .catch((error)=> res.status(400).send("Bad request"))
     })
     .catch((error)=>{
         res.status(400).send("Bad request");
     })
 })
-// vytvorenie terminov pre psa TODO DOROBIT
+// vytvorenie terminov pre psa
 app.post('/terms/create',(req,res)=>{
     dog_id = req.query.dog_id;
     if (!check_token_and_id(req.query.token, dog_id, res))
-        return
+        return;
         
-    start_date = req.body.start_date
-    days = req.body.days
+    start_date = req.body.start_date;
+    days = req.body.days;
+    if (start_date == undefined || days == undefined) {
+        res.status(400).send("Bad params");
+        return;
+    }
+
+    userID = tokens[token]["id"];
     //ziskam posledny formular pre psa
     var time = undefined
-    db.one("SELECT time from terms WHERE dog_id=$1 ORDER BY time DESC LIMIT 1",[dog_id])
+    db.one("SELECT time from terms WHERE dog_id=$1 AND terms.dog_id IN (SELECT dogs.id FROM dogs WHERE shelter_id = $2) ORDER BY time DESC LIMIT 1",[dog_id, userID])
     .then((data) => {
         time = data.time
         insert_terms(dog_id,time)
@@ -471,7 +546,6 @@ app.post('/terms/create',(req,res)=>{
         insert_terms(dog_id,new Date())
     })
     res.send("OK")
-    
 
 })
 function insert_terms(dog_id, time){
@@ -493,11 +567,15 @@ app.put('/terms/update',(req,res)=>{
     token = req.query.token;
     term_id = req.query.term_id;
     if (!check_token_and_id(token, term_id, res)) 
-        return
+        return;
 
     free = req.body.free
+    if (free == undefined) {
+        res.status(400).send("Bad params");
+        return;
+    }
+
     user_id = tokens[token]["id"]
-    console.log(user_id)
     db.one("UPDATE terms SET free=$1, user_id=$2 WHERE id=$3 RETURNING id",[free,user_id,term_id])
     .then((data)=>{
         res.send("OK")
@@ -509,37 +587,65 @@ app.put('/terms/update',(req,res)=>{
 
 //nacitanie obrazku psa
 app.get('/image', (req, res) => {
-    dog_id = req.query.dog_id;
-    if (!check_token_and_id(req.query.token, dog_id, res))
-        return
-
-    db.one('SELECT * FROM dogs WHERE dogs.id = $1', [dog_id])
-    .then((data) => {
-        image_info = {
-            "type": data.image_type,
-            "name": data.image_name,
-            "data": data.image_data.toString('base64')
-        }
-        console.log(image_info)
-        res.json(image_info)
-    })
-    .catch((error)=>{
-        console.log(error)
-        res.status(400).json({'message':'Wrong request'})
-    })
-})
-
-//nahratie obrazku psa
-app.put('/image/insert', upload.single('file'), (req, res) => {
     token = req.query.token;
     dog_id = req.query.dog_id;
     if (!check_token_and_id(token, dog_id, res))
         return
 
+    userID = tokens[token]["id"]
+    shelter = tokens[token]["shelter"]
+    if (shelter == true) {
+        db.one('SELECT * FROM dogs WHERE dogs.id = $1 AND dogs.shelter_id = $2', [dog_id, userID])
+        .then((data) => {
+            image_info = {
+                "type": data.image_type,
+                "name": data.image_name,
+                "data": data.image_data.toString('base64')
+            }
+            console.log(image_info)
+            res.json(image_info)
+        })
+        .catch((error)=>{
+            console.log(error)
+            res.status(400).json({'message':'Wrong request'})
+        })
+    }
+    else {
+        db.one('SELECT * FROM dogs WHERE dogs.id = $1', [dog_id])
+        .then((data) => {
+            image_info = {
+                "type": data.image_type,
+                "name": data.image_name,
+                "data": data.image_data.toString('base64')
+            }
+            console.log(image_info)
+            res.json(image_info)
+        })
+        .catch((error)=>{
+            console.log(error)
+            res.status(400).json({'message':'Wrong request'})
+        })
+    }
+    
+})
+
+//nahratie obrazku psa
+app.post('/image/insert', upload.single('file'), (req, res) => {
+    token = req.query.token;
+    dog_id = req.query.dog_id;
+    if (!check_token_and_id(token, dog_id, res))
+        return;
+
+    if (req.file == undefined) {
+        res.status(400).send("Bad params");
+        return;
+    }
     type = req.file.mimetype;
     image_name = req.file.originalname;
     image_data = req.file.buffer;
-    db.one("UPDATE dogs SET image_type = $1, image_name = $2, image_data = $3 WHERE id = $4 RETURNING id", [type, image_name, image_data, dog_id])
+    userID = tokens[token]["id"];
+
+    db.one("UPDATE dogs SET image_type = $1, image_name = $2, image_data = $3 WHERE id = $4 AND shelter_id = $5 RETURNING id", [type, image_name, image_data, dog_id, userID])
     .then((data) => {
         console.log(data)
         res.json(data)
