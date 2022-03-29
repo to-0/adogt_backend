@@ -656,6 +656,15 @@ app.post('/image/insert', upload.single('file'), (req, res) => {
     })
 })
 
+//odhlasenie pouzivatela
+app.get('/users/logout', (req, res) => {
+    token = req.query.token;
+    if (!check_token(token, res))
+        return;
+    
+    tokens[token] = undefined;
+})
+
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`)
 })
