@@ -10,8 +10,6 @@ const app = express()
 app.use(cors())
 const port = 8000
 const upload = multer()
-const key = Buffer.from(crypto.randomBytes(32))
-const iv = crypto.randomBytes(16)
 
 //ulozene tokeny podla ID pouzivatela
 var tokens = {"testToken":{id:6,shelter:true}}
@@ -59,28 +57,6 @@ function check_token_and_id(token, id, res) {
     return true
 }
 
-function test(){
-    t = new Date()
-    console.log(t)
-    db.one("SELECT time from terms WHERE dog_id=$1 ORDER BY time DESC LIMIT 1",[1])
-    .then((data) => {
-        console.log("Dobry den")
-        console.log(data)
-        time = data.time;
-        console.log(data.time)
-        console.log(typeof time)
-        today = new Date(data.time)
-        console.log(today.getDate())
-        t =JSON.stringify(time).substring(0,11)
-        console.log(t, typeof t)
-        console.log(JSON.stringify(time))
-    })
-    .catch((error)=>{
-        console.log("Dobry vecer")
-        time = undefined
-    })
-    
-}
 
 
 // ----------------------------
@@ -107,13 +83,9 @@ app.get('/users/signUser', (req,res)=>{
     username = req.query.username
     password = req.query.password
     console.log(username, password)
-    encryption = crypto.createCipheriv('aes-256-cbc', key, iv);
-    encryptedPassword = encryption.update(password)
-    encryptedPassword += encryption.final('hex');
 
     db.one('SELECT * FROM users WHERE users.name = $1 and users.password = $2;',[username,password])
     .then((data)=>{
-        data.none('UPDATE users SET password = $2 WHERE name = $1;'[username, encryptedPassword]);
         t = uuidv4();
         tokens[t] = {"id":data.id,"shelter":data.shelter}
         console.log(data)
@@ -121,17 +93,7 @@ app.get('/users/signUser', (req,res)=>{
         res.json({'message':'OK','token':t});
     })
     .catch((error)=>{
-        db.one('SELECT * FROM users WHERE users.name = $1 and users.password = $2;',[username,encryptedPassword])
-        .then((data)=>{
-            t = uuidv4();
-            tokens[t] = {"id":data.id,"shelter":data.shelter}
-            console.log(data)
-            console.log(tokens)
-            res.json({'message':'OK','token':t});
-        })
-        .catch((error)=>{
-            res.status(400).json({'message':'Invalid username or password'})
-        })
+            res.status(400).json({'message':'Invalid username or password'});
     })
 
 })
@@ -141,10 +103,6 @@ app.post('/users/register',(req,res)=>{
     email = req.body.email;
     password = req.body.password;
     shelter = req.body.shelter;
-
-    encryption = crypto.createCipheriv('aes-256-cbc', key, iv);
-    password = encryption.update(password)
-    password += encryption.final('hex');
 
     console.log(username,password,email);
     // ak pouzivatel neexistuje
@@ -526,14 +484,7 @@ app.post('/terms/create',(req,res)=>{
     dog_id = req.query.dog_id;
     if (!check_token_and_id(req.query.token, dog_id, res))
         return;
-        
-    start_date = req.body.start_date;
-    days = req.body.days;
-    if (start_date == undefined || days == undefined) {
-        res.status(400).send("Bad params");
-        return;
-    }
-
+    token = req.query.token;
     userID = tokens[token]["id"];
     //ziskam posledny formular pre psa
     var time = undefined
@@ -552,7 +503,7 @@ function insert_terms(dog_id, time){
     var today;
     today = new Date(time)
     var date = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
-    for(let i=1;i<=3;i++){
+    for(let i=1;i<=7;i++){
         next_date = new Date();
         next_date.setDate(today.getDate()+i)
         date = next_date.getFullYear()+'-'+(next_date.getMonth()+1)+'-'+next_date.getDate();
@@ -644,7 +595,7 @@ app.post('/image/insert', upload.single('file'), (req, res) => {
     image_name = req.file.originalname;
     image_data = req.file.buffer;
     userID = tokens[token]["id"];
-
+    console.log(userID)
     db.one("UPDATE dogs SET image_type = $1, image_name = $2, image_data = $3 WHERE id = $4 AND shelter_id = $5 RETURNING id", [type, image_name, image_data, dog_id, userID])
     .then((data) => {
         console.log(data)
