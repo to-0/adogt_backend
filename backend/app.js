@@ -614,6 +614,7 @@ app.get('/users/logout', (req, res) => {
         return;
     
     tokens[token] = undefined;
+    res.status(200).send("OK")
 })
 
 app.listen(port, () => {
