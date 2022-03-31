@@ -90,7 +90,7 @@ app.get('/users/signUser', (req,res)=>{
         tokens[t] = {"id":data.id,"shelter":data.shelter}
         console.log(data)
         console.log(tokens)
-        res.json({'message':'OK','token':t});
+        res.json({'message':'OK','token':t, 'shelter': data.shelter, 'email': data.email});
     })
     .catch((error)=>{
             res.status(400).json({'message':'Invalid username or password'});
@@ -172,6 +172,7 @@ app.get('/dogs/getAll', (req, res) => {
         })
         .catch((error) => {
             res.json(error)
+            console.log('error')
             res.status(400).json({'message': 'Wrong request'})
         })
     }
@@ -567,7 +568,8 @@ app.get('/image', (req, res) => {
             image_info = {
                 "type": data.image_type,
                 "name": data.image_name,
-                "data": data.image_data.toString('base64')
+                "data": data.image_data.toString('base64'),
+                "message": "ok"
             }
             console.log(image_info)
             res.json(image_info)
@@ -611,9 +613,10 @@ app.post('/image/insert', upload.single('file'), (req, res) => {
 app.get('/users/logout', (req, res) => {
     token = req.query.token;
     if (!check_token(token, res))
-        return;
-    
+        res.status(400).json({"message": "Wrong request"});
     tokens[token] = undefined;
+    console.log("Pohodka");
+    res.json({"message": "OK"});
 })
 
 app.listen(port, () => {
