@@ -133,25 +133,33 @@ app.get('/dogs/getAll', (req, res) => {
     
     userID = tokens[token]["id"]
     shelter = tokens[token]["shelter"];
+    var raw_data = ''
     if (shelter == true) {  //pouzivatel je utulok
         db.many("SELECT * FROM dogs WHERE shelter_id = $1", userID)
         .then((data) => {
             dogs = []
             for (i = 0; i < data.length; i++) {
+                raw_data = data[i].image_data;
+                if (raw_data == null)
+                    raw_data = ''
                 dogs.push( {
                     "id": data[i].id,
                     "name": data[i].name,
                     "age": data[i].age,
                     "breed": data[i].breed,
-                    "image_location": data[i].image_location
+                    "image_type": data[i].image_type,
+                    //pridane po milestone 2
+                    "data": raw_data.toString('base64')
                 });
             }
             console.log(dogs)
             res.json(dogs)
+            return
         })
         .catch((error) => {
-            res.json(error)
+            //res.json(error)
             res.status(400).json({'message': 'Wrong request'})
+            return
         })
     }
     else { //pouzivatel je bezny
@@ -159,12 +167,16 @@ app.get('/dogs/getAll', (req, res) => {
         .then((data) => {
             dogs = []
             for (i = 0; i < data.length; i++) {
+                raw_data = data[i].image_data;
+                if (raw_data == null)
+                    raw_data = ''
                 dogs.push( {
                     "id": data[i].id,
                     "name": data[i].name,
                     "age": data[i].age,
                     "breed": data[i].breed,
-                    "image_location": data[i].image_location
+                    "image_type": data[i].image_type,
+                    "data": raw_data.toString('base64')
                 });
             }
             console.log(dogs)
@@ -190,6 +202,11 @@ app.get('/dogs/getDog', (req, res) => {
     if (shelter == true) {
         db.one('SELECT * FROM dogs WHERE dogs.id = $1 AND dogs.shelter_id = $2', [dog_id, userID])
         .then((data) => {
+            var raw_data = data.image_data
+            if(raw_data == null){
+                console.log("Je to undefined")
+                raw_data = ''
+            }
             dog_detail = {
                 "id": data.id,
                 "name": data.name,
@@ -197,7 +214,9 @@ app.get('/dogs/getDog', (req, res) => {
                 "age": data.age,
                 "details": data.details,
                 "shelter_id": data.shelter_id,
-                "health": data.health
+                "health": data.health,
+                // pridane po milestone 2
+                "data": raw_data.toString('base64')
             }
             console.log(dog_detail)
             res.json(dog_detail)
@@ -210,6 +229,10 @@ app.get('/dogs/getDog', (req, res) => {
     else {
         db.one('SELECT * FROM dogs WHERE dogs.id = $1', [dog_id])
         .then((data) => {
+            var raw_data = data.image_data
+            if(raw_data == null){
+                raw_data = ''
+            }
             dog_detail = {
                 "id": data.id,
                 "name": data.name,
@@ -217,7 +240,9 @@ app.get('/dogs/getDog', (req, res) => {
                 "age": data.age,
                 "details": data.details,
                 "shelter_id": data.shelter_id,
-                "health": data.health
+                "health": data.health,
+                // pridane po milestone 2
+                "data": raw_data.toString('base64')
             }
             console.log(dog_detail)
             res.json(dog_detail)
@@ -549,10 +574,14 @@ app.get('/image', (req, res) => {
     if (shelter == true) {
         db.one('SELECT * FROM dogs WHERE dogs.id = $1 AND dogs.shelter_id = $2', [dog_id, userID])
         .then((data) => {
+            var raw_data = data.image_data
+            if(raw_data == null){
+                raw_data = ''
+            }
             image_info = {
                 "type": data.image_type,
                 "name": data.image_name,
-                "data": data.image_data.toString('base64')
+                "data": raw_data.toString('base64')
             }
             console.log(image_info)
             res.json(image_info)
@@ -565,10 +594,15 @@ app.get('/image', (req, res) => {
     else {
         db.one('SELECT * FROM dogs WHERE dogs.id = $1', [dog_id])
         .then((data) => {
+            console.log(data)
+            var raw_data = data.image_data
+            if(raw_data == null){
+                raw_data = ''
+            }
             image_info = {
                 "type": data.image_type,
                 "name": data.image_name,
-                "data": data.image_data.toString('base64'),
+                "data":raw_data.toString('base64'),
                 "message": "ok"
             }
             console.log(image_info)
@@ -612,8 +646,10 @@ app.post('/image/insert', upload.single('file'), (req, res) => {
 //odhlasenie pouzivatela
 app.get('/users/logout', (req, res) => {
     token = req.query.token;
-    if (!check_token(token, res))
+    if (!check_token(token, res)){
         res.status(400).json({"message": "Wrong request"});
+        return
+    }
     tokens[token] = undefined;
     console.log("Pohodka");
     res.json({"message": "OK"});
