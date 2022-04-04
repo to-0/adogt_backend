@@ -318,16 +318,17 @@ app.post('/dogs/addDog', (req, res) => {
     age = req.body.age;
     health = req.body.health;
     details = req.body.details;
+    console.log(req.body);
     //photo = req.body.photo;
     if (dog_name == undefined || breed == undefined || age == undefined || details == undefined || health == undefined || shelter == false) {
-        res.status(400).send("Bad params");
+        res.status(400).json({"message": "Bad params"});
         return;
     }
 
     //db.one("INSERT INTO dogs (name, breed, age, details, image_location, shelter_id, health) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ID", [dog_name, breed, age, details, photo, userID, health])
     db.one("INSERT INTO dogs (name, breed, age, details, shelter_id, health) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID", [dog_name, breed, age, details, userID, health])
-    .then((data) => res.status(200).send("OK"))
-    .catch((error)=> res.status(400).send("Something went wrong"))
+    .then((data) => res.status(200).json({"message":"OK", "id": data.id}))
+    .catch((error)=> res.status(400).json({"message": "Something went wrong"}))
 })
 
 //uprava psa
@@ -431,7 +432,9 @@ app.get('/forms/detail',(req,res)=>{
             "dog_id": data.dog_id,
             "details": data.details,
             "type": data.form_type,
-            "created_at": data.created_at
+            "created_at": data.created_at,
+            //pridane po milestone 2
+            "finished": data.finished
         }
         res.json(result)
     })
@@ -481,10 +484,10 @@ app.put('/forms/edit',(req,res)=>{
 
     db.one("UPDATE forms SET details = $1, finished = $2 WHERE id=$3 AND user_id = $4 RETURNING id", [details,finished,formId, userID])
     .then((data)=>{
-        res.send("OK")
+        res.json({"message":"OK"})
     })
     .catch((error)=>{
-        res.status(400).send("Bad request")
+        res.status(400).json({"message":"Bad request"})
     })
 })
 // vymazanie formulara
@@ -498,8 +501,8 @@ app.delete('/forms/delete',(req,res)=>{
     db.one("DELETE from forms WHERE id=$2 AND (forms.user_id=$1 OR forms.dog_id IN (SELECT dogs.id FROM dogs WHERE shelter_id = $1)) RETURNING dog_id",[userID,form_id])
     .then((data)=>{
         db.any("DELETE FROM terms WHERE dog_id = $1 and form_id = $2", [data.dog_id, form_id])
-        .then((data) => res.send("OK"))
-        .catch((error)=> res.status(400).send("Bad request"))
+        .then((data) => res.json({"message":"OK"}))
+        .catch((error)=> res.status(400).json({"message":"Bad request"}))
     })
     .catch((error)=>{
         res.status(400).send("Bad request");
@@ -618,13 +621,14 @@ app.get('/image', (req, res) => {
 
 //nahratie obrazku psa
 app.post('/image/insert', upload.single('file'), (req, res) => {
+    console.log(req)
     token = req.query.token;
     dog_id = req.query.dog_id;
     if (!check_token_and_id(token, dog_id, res))
         return;
 
     if (req.file == undefined) {
-        res.status(400).send("Bad params");
+        res.status(400).json({"message":"Bad params"});
         return;
     }
     type = req.file.mimetype;
