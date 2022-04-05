@@ -389,7 +389,7 @@ app.post('/forms/create', (req,res)=>{
         return;
     }
 
-    db.one("INSERT INTO forms(form_type,details,dog_id,user_id,created_at) VALUES ($1, $2, $3,$4, CURRENT_DATE) RETURNING ID", [type,details,dog_id,userID])
+    db.one("INSERT INTO forms(form_type,details,dog_id,user_id,created_at,finished) VALUES ($1, $2, $3,$4, CURRENT_DATE, false) RETURNING ID", [type,details,dog_id,userID])
     .then((data)=>{
         //ak je to vencenie treba este sparovat termin s formularom
         if(type==2){
@@ -397,24 +397,24 @@ app.post('/forms/create', (req,res)=>{
             if(term_id == undefined){
                 db.any("DELETE FROM forms WHERE id=$1",[data.id])
                 .then((data)=>{
-                    res.status(400).send("Something went wrong");
+                    res.status(400).json({"message": "Something went wrong"});
                 })
                 .catch((error)=>{
-                    res.status(400).send("Something went wrong");
+                    res.status(400).json({"message": "Something went wrong"});
                 }) 
             }
             db.one("UPDATE terms SET form_id=$1 WHERE terms.id=$2 RETURNING id",[data.id,term_id])
             .then((data)=>{
-                res.send("OK")
+                res.json({"message":"OK"})
             })
             .catch((error)=>{
-                res.status(400).send("Something went wrong")
+                res.status(400).json({"message": "Something went wrong"});
             })
         }
-        res.status(200).send("OK")
+        res.status(200).json({"message": "OK"});
     })
     .catch((error)=>{
-        res.status(400).send("Something went wrong");
+        res.status(400).json({"message": "Something went wrong"});
     })
 })
 //načítanie detailu formulára
