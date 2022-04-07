@@ -28,17 +28,18 @@ const db = pgp(`postgres://${process.env["DB_USER"]}:${process.env["DB_PASS"]}@l
 
 // vrati false ak pouzivatel neexistuje
 function check_user(username,email){
-    db.one('SELECT * FROM users WHERE users.username = $1 or users.email = $2',[username,email])
+    console.log(username, email)
+    db.any('SELECT * FROM users WHERE users.name = $1 or users.email = $2',[username,email])
     .then((data)=>{
         console.log("user found");
         console.log(data);
         return true;
     })
     .catch((error)=>{
+        console.log(error);
         console.log('User not found');
         return false;
     })
-    return false;
 }
 
 function check_token(token, res){
@@ -106,7 +107,8 @@ app.post('/users/register',(req,res)=>{
 
     console.log(username,password,email);
     // ak pouzivatel neexistuje
-    if (check_user(username,email) == false){
+    var exist = check_user(username,email);
+    if (exist == false){
         db.one('INSERT INTO users(name,email,password,shelter) VALUES($1, $2, $3,$4) RETURNING id,shelter', [username, email, password,shelter])
         .then((data)=>{
             t = uuidv4();
@@ -122,7 +124,7 @@ app.post('/users/register',(req,res)=>{
         })
     }
     else{
-        res.status(400).send({'message':'User already exists'});
+        res.status(400).json({'message':'User already exists'});
     }
 })
 //nacitanie psov
