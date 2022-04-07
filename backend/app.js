@@ -44,21 +44,11 @@ function check_user(username,email){
 
 function check_token(token, res){
     if (tokens[token] == undefined) {
-        res.status(400).send("Invalid token")
-        return false
+        res.status(401).json({"message": "Unauthorized user or invalid token."});
+        return false;
     }
     return true
 }
-
-function check_token_and_id(token, id, res) {
-    if(tokens[token] == undefined || id == undefined){
-        res.status(400).send("Invalid token or id");
-        return false
-    }
-    return true
-}
-
-
 
 // ----------------------------
 //      SAMOTNE REQUESTY 
@@ -94,7 +84,7 @@ app.get('/users/signUser', (req,res)=>{
         res.json({'message':'OK','token':t, 'shelter': data.shelter, 'email': data.email});
     })
     .catch((error)=>{
-            res.status(400).json({'message':'Invalid username or password'});
+            res.status(404).json({'message':'Invalid username or password'});
     })
 
 })
@@ -107,8 +97,14 @@ app.post('/users/register',(req,res)=>{
 
     console.log(username,password,email);
     // ak pouzivatel neexistuje
-    var exist = check_user(username,email);
-    if (exist == false){
+    console.log(check_user(username, email))
+    var exists = check_user(username, email);
+    if (exists == false){
+        if (username == undefined || email == undefined || password == undefined || shelter == undefined) {
+            res.status(404).json({'message':'Not all attributes provided'});
+            return;
+        }
+        
         db.one('INSERT INTO users(name,email,password,shelter) VALUES($1, $2, $3,$4) RETURNING id,shelter', [username, email, password,shelter])
         .then((data)=>{
             t = uuidv4();
@@ -120,11 +116,11 @@ app.post('/users/register',(req,res)=>{
         })
         .catch((error)=>{
             console.log(error)
-            res.status(400).json({'message':'Fail'});
+            res.status(404).json({'message':'Inserting data was not successful'});
         })
     }
     else{
-        res.status(400).json({'message':'User already exists'});
+        res.status(409).json({'message':'User already exists'});
     }
 })
 //nacitanie psov
@@ -159,8 +155,7 @@ app.get('/dogs/getAll', (req, res) => {
             return
         })
         .catch((error) => {
-            //res.json(error)
-            res.status(400).json({'message': 'Wrong request'})
+            res.status(404).json({'message': 'No data found'})
             return
         })
     }
@@ -185,9 +180,7 @@ app.get('/dogs/getAll', (req, res) => {
             res.json(dogs)
         })
         .catch((error) => {
-            res.json(error)
-            console.log('error')
-            res.status(400).json({'message': 'Wrong request'})
+            res.status(404).json({'message': 'No data found'})
         })
     }
 })
@@ -196,8 +189,18 @@ app.get('/dogs/getAll', (req, res) => {
 app.get('/dogs/getDog', (req, res) => {
     token = req.query.token;
     dog_id = req.query.dog_id;
-    if (!check_token_and_id(token, dog_id, res))
+    if (!check_token(token, res))
         return;
+
+    if (dog_id == undefined) {
+        res.status(404).json({'message':'Not all attributes provided'});
+        return;
+    }
+
+    if (isNaN(parseInt(dog_id))) {
+        res.status(400).json({'message':'Not proper format of attributes.'});
+        return;
+    }
 
     userID = tokens[token]["id"];
     shelter = tokens[token]["shelter"];
@@ -206,7 +209,6 @@ app.get('/dogs/getDog', (req, res) => {
         .then((data) => {
             var raw_data = data.image_data
             if(raw_data == null){
-                console.log("Je to undefined")
                 raw_data = ''
             }
             dog_detail = {
@@ -225,7 +227,7 @@ app.get('/dogs/getDog', (req, res) => {
         })
         .catch((error)=>{
             console.log(error)
-            res.status(400).json({'message':'Wrong request'})
+            res.status(404).json({'message':'No data found'})
         })
     }
     else {
@@ -251,7 +253,7 @@ app.get('/dogs/getDog', (req, res) => {
         })
         .catch((error)=>{
             console.log(error)
-            res.status(400).json({'message':'Wrong request'})
+            res.status(404).json({'message':'No data found'})
         })
     }
 })
@@ -260,8 +262,17 @@ app.get('/dogs/getDog', (req, res) => {
 app.get('/terms', (req, res) => {
     token = req.query.token;
     dog_id = req.query.dog_id;
-    if (!check_token_and_id(req.query.token, dog_id, res))
+    if (!check_token(req.query.token, res))
         return;
+
+    if (dog_id == undefined) {
+        res.status(404).json({'message':'Not all attributes provided'});
+        return;
+    }
+    if (isNaN(parseInt(dog_id))) {
+        res.status(400).json({'message':'Not proper format of attributes.'});
+        return;
+    }
     
     userID = tokens[token]["id"];
     shelter = tokens[token]["shelter"];
@@ -282,7 +293,7 @@ app.get('/terms', (req, res) => {
         })
         .catch((error) => {
             console.log(error)
-            res.status(400).json({'message':'Wrong request'})
+            res.status(404).json({'message':'No data found'})
         })
     }
     else {
@@ -302,7 +313,7 @@ app.get('/terms', (req, res) => {
         })
         .catch((error) => {
             console.log(error)
-            res.status(400).json({'message':'Wrong request'})
+            res.status(404).json({'message':'No data found'})
         })
     }
 })
@@ -322,15 +333,25 @@ app.post('/dogs/addDog', (req, res) => {
     details = req.body.details;
     console.log(req.body);
     //photo = req.body.photo;
-    if (dog_name == undefined || breed == undefined || age == undefined || details == undefined || health == undefined || shelter == false) {
-        res.status(400).json({"message": "Bad params"});
+    if (dog_name == undefined || breed == undefined || age == undefined || details == undefined || health == undefined) {
+        res.status(404).json({"message": "Not all attributes provided"});
+        return;
+    }
+
+    if (shelter == false) {
+        res.status(401).json({"message": "Signed user is not a shelter"});
+        return;
+    }
+
+    if (isNaN(parseInt(age))) {
+        res.status(400).json({'message':'Not proper format of attributes.'});
         return;
     }
 
     //db.one("INSERT INTO dogs (name, breed, age, details, image_location, shelter_id, health) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ID", [dog_name, breed, age, details, photo, userID, health])
     db.one("INSERT INTO dogs (name, breed, age, details, shelter_id, health) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID", [dog_name, breed, age, details, userID, health])
     .then((data) => res.status(200).json({"message":"OK", "id": data.id}))
-    .catch((error)=> res.status(400).json({"message": "Something went wrong"}))
+    .catch((error)=> res.status(400).json({"message": "No data to be inserted"}))
 })
 
 //uprava psa
@@ -347,32 +368,57 @@ app.put('/dogs/editDog', (req, res) => {
     details = req.body.details;
     shelter = tokens[token]["shelter"];
     userID = tokens[token]["id"];
-    if (dog_name == undefined || breed == undefined || age == undefined || details == undefined || health == undefined || dog_id == undefined || shelter == false) {
-        res.status(400).send("Bad params or user is not a shelter");
+    if (dog_name == undefined || breed == undefined || age == undefined || details == undefined || health == undefined || dog_id == undefined) {
+        res.status(404).json({"message": "Not all attributes provided"});
+        return;
+    }
+
+    if (shelter == false) {
+        res.status(401).json({"message": "Signed user is not a shelter"});
+        return;
+    }
+
+    if (isNaN(parseInt(age))) {
+        res.status(400).json({'message':'Not proper format of attributes.'});
         return;
     }
 
     db.one("UPDATE dogs SET name = $1, breed = $2, age = $3, details = $4, health = $5  WHERE id = $6 and shelter_id=$7 RETURNING id", 
         [dog_name, breed, age, details, health, dog_id,userID])
-    .then((data) => res.send("OK"))
-    .catch((error)=> res.status(400).send("Bad request"))
+    .then((data) => res.status(200).json({"message": "OK"}))
+    .catch((error)=> res.status(404).json({"message": "No data to be updated"}))
 })
 
 //vymazanie psa
 app.delete('/dogs/deleteDog', (req, res) => {
     token = req.query.token;
     dog_id = req.query.dog_id;
-    if (!check_token_and_id(token, dog_id, res))
-        return
-
     userID = tokens[token]["id"];
+    shelter = tokens[token]["shelter"];
+    if (!check_token(token, res))
+        return;
+
+    if (dog_id == undefined) {
+        res.status(404).json({"message": "Not all attributes provided"});
+        return;
+    }
+
+    if (shelter == false) {
+        res.status(401).json({"message": "Signed user is not a shelter"});
+        return;
+    }
+
+    if (isNaN(parseInt(dog_id))) {
+        res.status(400).json({'message':'Not proper format of attributes.'});
+        return;
+    }
+
     db.any("DELETE FROM dogs WHERE dogs.shelter_id = $1 AND dogs.id = $2;", [userID, dog_id])
     .then((data) => {
         db.any("DELETE FROM terms WHERE terms.dog_id = $2; DELETE FROM forms WHERE forms.dog_id = $2", [userID, dog_id])
-        .then((data) => res.send("OK"))
-        .catch((error) => res.status(400).send("Bad request"))
+        .then((data) => res.status(200).json({"message": "OK"}))
     })
-    .catch((error) => res.status(400).send("Bad request this"))
+    .catch((error) => res.status(404).json({"message": "No data to be deleted"}))
 })
 
 // vytvorenie formulara
@@ -386,12 +432,22 @@ app.post('/forms/create', (req,res)=>{
     dog_id = req.body.dog_id;
     type = req.body.type;
     details = req.body.details;
-    if(details == undefined || dog_id == undefined || type==undefined || shelter == true){
-        res.status(400).send("Bad params");
+    if(details == undefined || dog_id == undefined || type==undefined){
+        res.status(404).json({"message": "Not all attributes provided"});
         return;
     }
 
-    db.one("INSERT INTO forms(form_type,details,dog_id,user_id,created_at) VALUES ($1, $2, $3,$4, CURRENT_DATE) RETURNING ID", [type,details,dog_id,userID])
+    if (shelter == true) {
+        res.status(401).json({"message": "Signed user is a shelter"});
+        return;
+    }
+
+    if (isNaN(parseInt(dog_id)) || isNaN(parseInt(type))) {
+        res.status(400).json({'message':'Not proper format of attributes.'});
+        return;
+    }
+
+    db.one("INSERT INTO forms(form_type,details,dog_id,user_id,created_at,finished) VALUES ($1, $2, $3,$4, CURRENT_DATE, false) RETURNING ID", [type,details,dog_id,userID])
     .then((data)=>{
         //ak je to vencenie treba este sparovat termin s formularom
         if(type==2){
@@ -399,32 +455,42 @@ app.post('/forms/create', (req,res)=>{
             if(term_id == undefined){
                 db.any("DELETE FROM forms WHERE id=$1",[data.id])
                 .then((data)=>{
-                    res.status(400).send("Something went wrong");
+                    res.status(400).json({"message": "Not all attributes provided"});
                 })
                 .catch((error)=>{
-                    res.status(400).send("Something went wrong");
+                    res.status(404).json({"message": "No data to be deleted and not all attributes provided"});
                 }) 
             }
             db.one("UPDATE terms SET form_id=$1 WHERE terms.id=$2 RETURNING id",[data.id,term_id])
             .then((data)=>{
-                res.send("OK")
+                res.status(200).json({"message":"OK"})
             })
             .catch((error)=>{
-                res.status(400).send("Something went wrong")
+                res.status(404).json({"message": "No data to be updated"});
             })
         }
-        res.status(200).send("OK")
+        res.status(200).json({"message": "OK"});
     })
     .catch((error)=>{
-        res.status(400).send("Something went wrong");
+        res.status(400).json({"message": "No data found"});
     })
 })
 //načítanie detailu formulára
 app.get('/forms/detail',(req,res)=>{
     form_id = req.query.form_id;
     token = req.query.token;
-    if (!check_token_and_id(token, form_id, res))
+    if (!check_token(token, res))
         return;
+
+    if (form_id == undefined) {
+        res.status(404).json({"message": "Not all attributes provided"});
+        return;
+    }
+
+    if (isNaN(parseInt(form_id))) {
+        res.status(400).json({'message':'Not proper format of attributes.'});
+        return;
+    }
     
     userID = tokens[token]["id"];
     db.one("SELECT * FROM forms WHERE id=$1 AND (forms.user_id=$2 OR forms.dog_id IN (SELECT dogs.id FROM dogs WHERE shelter_id = $2))",[form_id, userID])
@@ -438,11 +504,11 @@ app.get('/forms/detail',(req,res)=>{
             //pridane po milestone 2
             "finished": data.finished
         }
-        res.json(result)
+        res.json(result);
     })
     .catch((error)=>{
         console.log(error)
-        res.status(400).send("Wrong request")
+        res.status(404).json({"message" : "No data found"})
     })
 })
 app.get('/forms/getAll',(req,res)=>{
@@ -450,7 +516,7 @@ app.get('/forms/getAll',(req,res)=>{
     if (!check_token(token, res))
         return
 
-    db.any("SELECT * FROM forms WHERE user_id=$1 OR forms.dog_id IN (SELECT dogs.id FROM dogs WHERE shelter_id = $1) ORDER BY id",[tokens[token]["id"]])
+    db.many("SELECT * FROM forms WHERE user_id=$1 OR forms.dog_id IN (SELECT dogs.id FROM dogs WHERE shelter_id = $1) ORDER BY id",[tokens[token]["id"]])
     .then((data)=>{
         forms = []
         for(var i=0; i<data.length;i++){
@@ -466,7 +532,7 @@ app.get('/forms/getAll',(req,res)=>{
     })
     .catch((error)=>{
         console.log(error)
-        res.status(400).send("No forms for this user")
+        res.status(404).json({"message": "No data found"})
     })
 })
 // editovanie formulara
@@ -476,47 +542,85 @@ app.put('/forms/edit',(req,res)=>{
         return;
 
     userID = tokens[token]["id"]; 
+    shelter = tokens[token]["shelter"];
     formId = req.query.form_id;
     details = req.body.details;
     finished = req.body.finished;
     if (formId == undefined || details == undefined || finished == undefined) {
-        res.status(400).send("Bad params");
+        res.status(404).json({"message": "Not all attributes provided"});
+        return;
+    }
+
+    if (shelter == true) {
+        res.status(401).json({"message": "Signed user is a shelter"});
+        return;
+    }
+
+    if (isNaN(parseInt(formId))) {
+        res.status(400).json({'message':'Not proper format of attributes.'});
         return;
     }
 
     db.one("UPDATE forms SET details = $1, finished = $2 WHERE id=$3 AND user_id = $4 RETURNING id", [details,finished,formId, userID])
     .then((data)=>{
-        res.json({"message":"OK"})
+        res.status(200).json({"message":"OK"})
     })
     .catch((error)=>{
-        res.status(400).json({"message":"Bad request"})
+        res.status(404).json({"message":"No data to be updated"})
     })
 })
 // vymazanie formulara
 app.delete('/forms/delete',(req,res)=>{
     token = req.query.token;
     form_id = req.query.form_id;
-    if (!check_token_and_id(token, form_id, res))
+    if (!check_token(token, res))
         return
+
+    if (form_id == undefined) {
+        res.status(404).json({"message": "Not all attributes provided"});
+        return;
+    }
+
+    if (isNaN(parseInt(form_id))) {
+        res.status(400).json({'message':'Not proper format of attributes.'});
+        return;
+    }
 
     userID = tokens[token]["id"];
     db.one("DELETE from forms WHERE id=$2 AND (forms.user_id=$1 OR forms.dog_id IN (SELECT dogs.id FROM dogs WHERE shelter_id = $1)) RETURNING dog_id",[userID,form_id])
     .then((data)=>{
         db.any("DELETE FROM terms WHERE dog_id = $1 and form_id = $2", [data.dog_id, form_id])
-        .then((data) => res.json({"message":"OK"}))
-        .catch((error)=> res.status(400).json({"message":"Bad request"}))
+        .then((data) => res.status(200).json({"message":"OK"}))
+        .catch((error)=> res.status(404).json({"message":"No data to be deleted"}))
     })
     .catch((error)=>{
-        res.status(400).send("Bad request");
+        res.status(404).json({"message": "No data to be deleted"});
     })
 })
 // vytvorenie terminov pre psa
 app.post('/terms/create',(req,res)=>{
-    dog_id = req.query.dog_id;
-    if (!check_token_and_id(req.query.token, dog_id, res))
-        return;
     token = req.query.token;
     userID = tokens[token]["id"];
+    shelter = tokens[token]["shelter"]
+    dog_id = req.query.dog_id;
+    if (!check_token(token, res))
+        return;
+
+    if (dog_id == undefined) {
+        res.status(404).json({"message": "Not all attributes provided"});
+        return;
+    }
+
+    if (shelter == false) {
+        res.status(401).json({"message": "Signed user is not a shelter"});
+        return;
+    }
+
+    if (isNaN(parseInt(dog_id))) {
+        res.status(400).json({'message':'Not proper format of attributes.'});
+        return;
+    }
+
     //ziskam posledny formular pre psa
     var time = undefined
     db.one("SELECT time from terms WHERE dog_id=$1 AND terms.dog_id IN (SELECT dogs.id FROM dogs WHERE shelter_id = $2) ORDER BY time DESC LIMIT 1",[dog_id, userID])
@@ -527,7 +631,7 @@ app.post('/terms/create',(req,res)=>{
     .catch((error)=>{
         insert_terms(dog_id,new Date())
     })
-    res.send("OK")
+    res.status(200).json({"message": "OK"})
 
 })
 function insert_terms(dog_id, time){
@@ -548,22 +652,27 @@ function insert_terms(dog_id, time){
 app.put('/terms/update',(req,res)=>{
     token = req.query.token;
     term_id = req.query.term_id;
-    if (!check_token_and_id(token, term_id, res)) 
+    if (!check_token(token, res)) 
         return;
 
     free = req.body.free
-    if (free == undefined) {
-        res.status(400).send("Bad params");
+    if (term_id == undefined || free == undefined) {
+        res.status(404).json({"message": "Not all attributes provided"});
+        return;
+    }
+
+    if (isNaN(parseInt(term_id))) {
+        res.status(400).json({'message':'Not proper format of attributes.'});
         return;
     }
 
     user_id = tokens[token]["id"]
     db.one("UPDATE terms SET free=$1, user_id=$2 WHERE id=$3 RETURNING id",[free,user_id,term_id])
     .then((data)=>{
-        res.send("OK")
+        res.status(200).json({"message": "OK"})
     })
     .catch((error)=>{
-        res.status(400).send("Bad request")
+        res.status(404).json({"message": "No data to be updated"})
     })
 })
 
@@ -571,8 +680,18 @@ app.put('/terms/update',(req,res)=>{
 app.get('/image', (req, res) => {
     token = req.query.token;
     dog_id = req.query.dog_id;
-    if (!check_token_and_id(token, dog_id, res))
+    if (!check_token(token, res))
         return
+
+    if (dog_id == undefined) {
+        res.status(404).json({"message": "Not all attributes provided"});
+        return;
+    }
+
+    if (isNaN(parseInt(dog_id))) {
+        res.status(400).json({'message':'Not proper format of attributes.'});
+        return;
+    }
 
     userID = tokens[token]["id"]
     shelter = tokens[token]["shelter"]
@@ -593,7 +712,7 @@ app.get('/image', (req, res) => {
         })
         .catch((error)=>{
             console.log(error)
-            res.status(400).json({'message':'Wrong request'})
+            res.status(404).json({'message':'No data found'})
         })
     }
     else {
@@ -615,7 +734,7 @@ app.get('/image', (req, res) => {
         })
         .catch((error)=>{
             console.log(error)
-            res.status(400).json({'message':'Wrong request'})
+            res.status(404).json({'message':'No data found'})
         })
     }
     
@@ -623,21 +742,31 @@ app.get('/image', (req, res) => {
 
 //nahratie obrazku psa
 app.post('/image/insert', upload.single('file'), (req, res) => {
-    console.log(req)
     token = req.query.token;
     dog_id = req.query.dog_id;
-    if (!check_token_and_id(token, dog_id, res))
+    if (!check_token(token, res))
         return;
 
-    if (req.file == undefined) {
-        res.status(400).json({"message":"Bad params"});
+    shelter = tokens[token]["shelter"];
+    if (req.file == undefined || dog_id == undefined) {
+        res.status(404).json({"message": "Not all attributes provided"});
         return;
     }
+
+    if (shelter == false) {
+        res.status(401).json({"message": "Signed user is not a shelter"});
+        return;
+    }
+
+    if (isNaN(parseInt(dog_id))) {
+        res.status(400).json({'message':'Not proper format of attributes.'});
+        return;
+    }
+
     type = req.file.mimetype;
     image_name = req.file.originalname;
     image_data = req.file.buffer;
     userID = tokens[token]["id"];
-    console.log(userID)
     db.one("UPDATE dogs SET image_type = $1, image_name = $2, image_data = $3 WHERE id = $4 AND shelter_id = $5 RETURNING id", [type, image_name, image_data, dog_id, userID])
     .then((data) => {
         console.log(data)
@@ -645,20 +774,19 @@ app.post('/image/insert', upload.single('file'), (req, res) => {
     })
     .catch((error)=>{
         console.log(error)
-        res.status(400).json({'message':'Wrong request'})
+        res.status(404).json({'message':'No data to be updated'})
     })
 })
 
 //odhlasenie pouzivatela
 app.get('/users/logout', (req, res) => {
     token = req.query.token;
-    if (!check_token(token, res)){
-        res.status(400).json({"message": "Wrong request"});
+    if (!check_token(token, res))
         return
-    }
+    
     tokens[token] = undefined;
     console.log("Pohodka");
-    res.json({"message": "OK"});
+    res.status(200).json({"message": "OK"});
 })
 
 app.listen(port, () => {
