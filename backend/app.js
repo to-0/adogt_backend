@@ -28,7 +28,8 @@ const db = pgp(`postgres://${process.env["DB_USER"]}:${process.env["DB_PASS"]}@l
 
 // vrati false ak pouzivatel neexistuje
 function check_user(username,email){
-    db.one('SELECT * FROM users WHERE users.username = $1 or users.email = $2',[username,email])
+    console.log("function " + username + " " + email);
+    db.one('SELECT * FROM users WHERE users.name = $1 or users.email = $2',[username,email])
     .then((data)=>{
         console.log("user found");
         console.log(data);
@@ -48,16 +49,6 @@ function check_token(token, res){
     }
     return true
 }
-
-function check_token_and_id(token, id, res) {
-    if(tokens[token] == undefined || id == undefined){
-        res.status(401).json({"message": "Unauthorized user or invalid token."});
-        return false;
-    }
-    return true
-}
-
-
 
 // ----------------------------
 //      SAMOTNE REQUESTY 
@@ -106,15 +97,13 @@ app.post('/users/register',(req,res)=>{
 
     console.log(username,password,email);
     // ak pouzivatel neexistuje
+    console.log(check_user(username, email))
     if (check_user(username,email) == false){
         if (username == undefined || email == undefined || password == undefined || shelter == undefined) {
             res.status(404).json({'message':'Not all attributes provided'});
             return;
         }
-        if (typeof username != "string" || typeof email != "string" || typeof password != "string" || typeof shelter != "number") {
-            res.status(400).json({'message':'Not proper format of attributes.'});
-            return;
-        }
+        
         db.one('INSERT INTO users(name,email,password,shelter) VALUES($1, $2, $3,$4) RETURNING id,shelter', [username, email, password,shelter])
         .then((data)=>{
             t = uuidv4();
@@ -165,7 +154,6 @@ app.get('/dogs/getAll', (req, res) => {
             return
         })
         .catch((error) => {
-            //res.json(error)
             res.status(404).json({'message': 'No data found'})
             return
         })
@@ -191,8 +179,6 @@ app.get('/dogs/getAll', (req, res) => {
             res.json(dogs)
         })
         .catch((error) => {
-            res.json(error)
-            console.log('error')
             res.status(404).json({'message': 'No data found'})
         })
     }
@@ -202,25 +188,26 @@ app.get('/dogs/getAll', (req, res) => {
 app.get('/dogs/getDog', (req, res) => {
     token = req.query.token;
     dog_id = req.query.dog_id;
-    if (!check_token_and_id(token, dog_id, res))
+    if (!check_token(token, res))
         return;
+
+    if (dog_id == undefined) {
+        res.status(404).json({'message':'Not all attributes provided'});
+        return;
+    }
+
+    if (isNaN(parseInt(dog_id))) {
+        res.status(400).json({'message':'Not proper format of attributes.'});
+        return;
+    }
 
     userID = tokens[token]["id"];
     shelter = tokens[token]["shelter"];
     if (shelter == true) {
-        if (dog_id == undefined) {
-            res.status(404).json({'message':'Not all attributes provided'});
-            return;
-        }
-        if (typeof dog_id != "number") {
-            res.status(400).json({'message':'Not proper format of attributes.'});
-            return;
-        }
         db.one('SELECT * FROM dogs WHERE dogs.id = $1 AND dogs.shelter_id = $2', [dog_id, userID])
         .then((data) => {
             var raw_data = data.image_data
             if(raw_data == null){
-                console.log("Je to undefined")
                 raw_data = ''
             }
             dog_detail = {
@@ -274,8 +261,17 @@ app.get('/dogs/getDog', (req, res) => {
 app.get('/terms', (req, res) => {
     token = req.query.token;
     dog_id = req.query.dog_id;
-    if (!check_token_and_id(req.query.token, dog_id, res))
+    if (!check_token(req.query.token, res))
         return;
+
+    if (dog_id == undefined) {
+        res.status(404).json({'message':'Not all attributes provided'});
+        return;
+    }
+    if (isNaN(parseInt(dog_id))) {
+        res.status(400).json({'message':'Not proper format of attributes.'});
+        return;
+    }
     
     userID = tokens[token]["id"];
     shelter = tokens[token]["shelter"];
@@ -346,7 +342,7 @@ app.post('/dogs/addDog', (req, res) => {
         return;
     }
 
-    if (typeof dog_name != "string" || typeof breed != "string" || typeof age != "number" || typeof details != "string" || typeof health != "string") {
+    if (isNaN(parseInt(age))) {
         res.status(400).json({'message':'Not proper format of attributes.'});
         return;
     }
@@ -354,7 +350,7 @@ app.post('/dogs/addDog', (req, res) => {
     //db.one("INSERT INTO dogs (name, breed, age, details, image_location, shelter_id, health) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ID", [dog_name, breed, age, details, photo, userID, health])
     db.one("INSERT INTO dogs (name, breed, age, details, shelter_id, health) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID", [dog_name, breed, age, details, userID, health])
     .then((data) => res.status(200).json({"message":"OK", "id": data.id}))
-    .catch((error)=> res.status(400).json({"message": "No data found"}))
+    .catch((error)=> res.status(400).json({"message": "No data to be inserted"}))
 })
 
 //uprava psa
@@ -381,7 +377,7 @@ app.put('/dogs/editDog', (req, res) => {
         return;
     }
 
-    if (typeof dog_name != "string" || typeof breed != "string" || typeof age != "number" || typeof details != "string" || typeof health != "string") {
+    if (isNaN(parseInt(age))) {
         res.status(400).json({'message':'Not proper format of attributes.'});
         return;
     }
@@ -396,7 +392,9 @@ app.put('/dogs/editDog', (req, res) => {
 app.delete('/dogs/deleteDog', (req, res) => {
     token = req.query.token;
     dog_id = req.query.dog_id;
-    if (!check_token_and_id(token, dog_id, res))
+    userID = tokens[token]["id"];
+    shelter = tokens[token]["shelter"];
+    if (!check_token(token, res))
         return;
 
     if (dog_id == undefined) {
@@ -409,17 +407,15 @@ app.delete('/dogs/deleteDog', (req, res) => {
         return;
     }
 
-    if (typeof dog_id != "number") {
+    if (isNaN(parseInt(dog_id))) {
         res.status(400).json({'message':'Not proper format of attributes.'});
         return;
     }
 
-    userID = tokens[token]["id"];
-    db.one("DELETE FROM dogs WHERE dogs.shelter_id = $1 AND dogs.id = $2;", [userID, dog_id])
+    db.any("DELETE FROM dogs WHERE dogs.shelter_id = $1 AND dogs.id = $2;", [userID, dog_id])
     .then((data) => {
         db.any("DELETE FROM terms WHERE terms.dog_id = $2; DELETE FROM forms WHERE forms.dog_id = $2", [userID, dog_id])
         .then((data) => res.status(200).json({"message": "OK"}))
-        .catch((error) => res.status(404).json({"message": "No data to be deleted"}))
     })
     .catch((error) => res.status(404).json({"message": "No data to be deleted"}))
 })
@@ -445,7 +441,7 @@ app.post('/forms/create', (req,res)=>{
         return;
     }
 
-    if (typeof details != "string" || typeof dog_id != "number" || typeof type != "number") {
+    if (isNaN(parseInt(dog_id)) || isNaN(parseInt(type))) {
         res.status(400).json({'message':'Not proper format of attributes.'});
         return;
     }
@@ -482,7 +478,7 @@ app.post('/forms/create', (req,res)=>{
 app.get('/forms/detail',(req,res)=>{
     form_id = req.query.form_id;
     token = req.query.token;
-    if (!check_token_and_id(token, form_id, res))
+    if (!check_token(token, res))
         return;
 
     if (form_id == undefined) {
@@ -490,7 +486,7 @@ app.get('/forms/detail',(req,res)=>{
         return;
     }
 
-    if (typeof form_id != "number") {
+    if (isNaN(parseInt(form_id))) {
         res.status(400).json({'message':'Not proper format of attributes.'});
         return;
     }
@@ -519,7 +515,7 @@ app.get('/forms/getAll',(req,res)=>{
     if (!check_token(token, res))
         return
 
-    db.any("SELECT * FROM forms WHERE user_id=$1 OR forms.dog_id IN (SELECT dogs.id FROM dogs WHERE shelter_id = $1) ORDER BY id",[tokens[token]["id"]])
+    db.many("SELECT * FROM forms WHERE user_id=$1 OR forms.dog_id IN (SELECT dogs.id FROM dogs WHERE shelter_id = $1) ORDER BY id",[tokens[token]["id"]])
     .then((data)=>{
         forms = []
         for(var i=0; i<data.length;i++){
@@ -545,6 +541,7 @@ app.put('/forms/edit',(req,res)=>{
         return;
 
     userID = tokens[token]["id"]; 
+    shelter = tokens[token]["shelter"];
     formId = req.query.form_id;
     details = req.body.details;
     finished = req.body.finished;
@@ -558,14 +555,14 @@ app.put('/forms/edit',(req,res)=>{
         return;
     }
 
-    if (typeof formId != "number" || typeof details != "string" || typeof finished != "string") {
+    if (isNaN(parseInt(formId))) {
         res.status(400).json({'message':'Not proper format of attributes.'});
         return;
     }
 
     db.one("UPDATE forms SET details = $1, finished = $2 WHERE id=$3 AND user_id = $4 RETURNING id", [details,finished,formId, userID])
     .then((data)=>{
-        res.send(200).json({"message":"OK"})
+        res.status(200).json({"message":"OK"})
     })
     .catch((error)=>{
         res.status(404).json({"message":"No data to be updated"})
@@ -575,7 +572,7 @@ app.put('/forms/edit',(req,res)=>{
 app.delete('/forms/delete',(req,res)=>{
     token = req.query.token;
     form_id = req.query.form_id;
-    if (!check_token_and_id(token, form_id, res))
+    if (!check_token(token, res))
         return
 
     if (form_id == undefined) {
@@ -583,7 +580,7 @@ app.delete('/forms/delete',(req,res)=>{
         return;
     }
 
-    if (typeof form_id != "number") {
+    if (isNaN(parseInt(form_id))) {
         res.status(400).json({'message':'Not proper format of attributes.'});
         return;
     }
@@ -601,8 +598,11 @@ app.delete('/forms/delete',(req,res)=>{
 })
 // vytvorenie terminov pre psa
 app.post('/terms/create',(req,res)=>{
+    token = req.query.token;
+    userID = tokens[token]["id"];
+    shelter = tokens[token]["shelter"]
     dog_id = req.query.dog_id;
-    if (!check_token_and_id(req.query.token, dog_id, res))
+    if (!check_token(token, res))
         return;
 
     if (dog_id == undefined) {
@@ -615,13 +615,11 @@ app.post('/terms/create',(req,res)=>{
         return;
     }
 
-    if (typeof dog_id != "number") {
+    if (isNaN(parseInt(dog_id))) {
         res.status(400).json({'message':'Not proper format of attributes.'});
         return;
     }
 
-    token = req.query.token;
-    userID = tokens[token]["id"];
     //ziskam posledny formular pre psa
     var time = undefined
     db.one("SELECT time from terms WHERE dog_id=$1 AND terms.dog_id IN (SELECT dogs.id FROM dogs WHERE shelter_id = $2) ORDER BY time DESC LIMIT 1",[dog_id, userID])
@@ -653,16 +651,16 @@ function insert_terms(dog_id, time){
 app.put('/terms/update',(req,res)=>{
     token = req.query.token;
     term_id = req.query.term_id;
-    if (!check_token_and_id(token, term_id, res)) 
+    if (!check_token(token, res)) 
         return;
 
     free = req.body.free
-    if (free == undefined) {
+    if (term_id == undefined || free == undefined) {
         res.status(404).json({"message": "Not all attributes provided"});
         return;
     }
 
-    if (typeof free != "string") {
+    if (isNaN(parseInt(term_id))) {
         res.status(400).json({'message':'Not proper format of attributes.'});
         return;
     }
@@ -681,7 +679,7 @@ app.put('/terms/update',(req,res)=>{
 app.get('/image', (req, res) => {
     token = req.query.token;
     dog_id = req.query.dog_id;
-    if (!check_token_and_id(token, dog_id, res))
+    if (!check_token(token, res))
         return
 
     if (dog_id == undefined) {
@@ -689,7 +687,7 @@ app.get('/image', (req, res) => {
         return;
     }
 
-    if (typeof dog_id != "number") {
+    if (isNaN(parseInt(dog_id))) {
         res.status(400).json({'message':'Not proper format of attributes.'});
         return;
     }
@@ -743,12 +741,12 @@ app.get('/image', (req, res) => {
 
 //nahratie obrazku psa
 app.post('/image/insert', upload.single('file'), (req, res) => {
-    console.log(req)
     token = req.query.token;
     dog_id = req.query.dog_id;
-    if (!check_token_and_id(token, dog_id, res))
+    if (!check_token(token, res))
         return;
 
+    shelter = tokens[token]["shelter"];
     if (req.file == undefined || dog_id == undefined) {
         res.status(404).json({"message": "Not all attributes provided"});
         return;
@@ -759,7 +757,7 @@ app.post('/image/insert', upload.single('file'), (req, res) => {
         return;
     }
 
-    if (typeof dog_id != "number") {
+    if (isNaN(parseInt(dog_id))) {
         res.status(400).json({'message':'Not proper format of attributes.'});
         return;
     }
@@ -768,7 +766,6 @@ app.post('/image/insert', upload.single('file'), (req, res) => {
     image_name = req.file.originalname;
     image_data = req.file.buffer;
     userID = tokens[token]["id"];
-    console.log(userID)
     db.one("UPDATE dogs SET image_type = $1, image_name = $2, image_data = $3 WHERE id = $4 AND shelter_id = $5 RETURNING id", [type, image_name, image_data, dog_id, userID])
     .then((data) => {
         console.log(data)
