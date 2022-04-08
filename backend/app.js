@@ -84,7 +84,7 @@ app.get('/users/signUser', (req,res)=>{
         res.json({'message':'OK','token':t, 'shelter': data.shelter, 'email': data.email});
     })
     .catch((error)=>{
-            res.status(404).json({'message':'Invalid username or password'});
+        res.status(404).json({'message':'Invalid username or password'});
     })
 
 })
@@ -431,8 +431,9 @@ app.post('/forms/create', (req,res)=>{
     shelter = tokens[token]["shelter"];
     dog_id = req.body.dog_id;
     type = req.body.type;
+    reason = req.body.reason;
     details = req.body.details;
-    if(details == undefined || dog_id == undefined || type==undefined){
+    if(reason == undefined || dog_id == undefined || type==undefined){
         res.status(404).json({"message": "Not all attributes provided"});
         return;
     }
@@ -447,7 +448,7 @@ app.post('/forms/create', (req,res)=>{
         return;
     }
 
-    db.one("INSERT INTO forms(form_type,details,dog_id,user_id,created_at,finished) VALUES ($1, $2, $3,$4, CURRENT_DATE, false) RETURNING ID", [type,details,dog_id,userID])
+    db.one("INSERT INTO forms(form_type,reason,details,dog_id,user_id,created_at,finished) VALUES ($1, $2, $3,$4, CURRENT_DATE, false) RETURNING ID", [type,reason,details,dog_id,userID])
     .then((data)=>{
         //ak je to vencenie treba este sparovat termin s formularom
         if(type==2){
@@ -498,6 +499,7 @@ app.get('/forms/detail',(req,res)=>{
         result = {
             "form_id": form_id,
             "dog_id": data.dog_id,
+            "reason": data.reason,
             "details": data.details,
             "type": data.form_type,
             "created_at": data.created_at,
@@ -544,9 +546,10 @@ app.put('/forms/edit',(req,res)=>{
     userID = tokens[token]["id"]; 
     shelter = tokens[token]["shelter"];
     formId = req.query.form_id;
+    reason = req.query.reason;
     details = req.body.details;
     finished = req.body.finished;
-    if (formId == undefined || details == undefined || finished == undefined) {
+    if (formId == undefined || reason == undefined || finished == undefined) {
         res.status(404).json({"message": "Not all attributes provided"});
         return;
     }
@@ -561,7 +564,7 @@ app.put('/forms/edit',(req,res)=>{
         return;
     }
 
-    db.one("UPDATE forms SET details = $1, finished = $2 WHERE id=$3 AND user_id = $4 RETURNING id", [details,finished,formId, userID])
+    db.one("UPDATE forms SET details = $1, finished = $2, reason = $3 WHERE id=$4 AND user_id = $5 RETURNING id", [details,finished,reason,formId, userID])
     .then((data)=>{
         res.status(200).json({"message":"OK"})
     })
