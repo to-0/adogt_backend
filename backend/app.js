@@ -439,6 +439,15 @@ app.post('/forms/create', (req,res)=>{
         return;
     }
 
+    if (reason == undefined){
+        if (type == 1) {
+            res.status(404).json({"message": "Not all attributes provided"});
+            return;
+        }
+        if (type == 2)
+            reason = null;
+    }
+
     if (shelter == true) {
         res.status(401).json({"message": "Signed user is a shelter"});
         return;
@@ -449,12 +458,12 @@ app.post('/forms/create', (req,res)=>{
         return;
     }
 
-    db.one("INSERT INTO forms(form_type,reason,details,dog_id,user_id,created_at,finished) VALUES ($1, $2, $3,$4, CURRENT_DATE, false) RETURNING ID", [type,reason,details,dog_id,userID])
+    db.one("INSERT INTO forms(form_type,reason,details,dog_id,user_id,created_at,finished) VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, false) RETURNING ID", [type,reason,details,dog_id,userID])
     .then((data)=>{
         //ak je to vencenie treba este sparovat termin s formularom
         if(type==2){
             term_id = req.body.term_id;
-            if(term_id == undefined){
+            if(term_id == undefined || term_id == null){
                 db.any("DELETE FROM forms WHERE id=$1",[data.id])
                 .then((data)=>{
                     console.log("Idem posielat ze atributy nie su poskytnute")
@@ -468,14 +477,12 @@ app.post('/forms/create', (req,res)=>{
                 })
                 
             }
-            db.one("UPDATE terms SET form_id=$1, free=false WHERE terms.id=$2 RETURNING id",[data.id,term_id])
+            db.one("UPDATE terms SET form_id=$1, user_id=$2, free=false WHERE terms.id=$3 RETURNING id",[data.id,userID,term_id])
             .then((data)=>{
-                console.log("IDem posielat ok, upravili sme aj termin")
-                res.status(200).json({"message":"OK tu"})
+                res.status(200).json({"message":"OK"});
                 return;
             })
             .catch((error)=>{
-                console.log("Idem poslat, ze ziadne data neboli updatnute neviem preco")
                 res.status(404).json({"message": "No data to be updated"});
                 return;
             })
@@ -605,18 +612,18 @@ app.delete('/forms/delete',(req,res)=>{
     }
 
     userID = tokens[token]["id"];
-    db.one("DELETE from forms WHERE id=$2 AND (forms.user_id=$1 OR forms.dog_id IN (SELECT dogs.id FROM dogs WHERE shelter_id = $1)) RETURNING dog_id",[userID,form_id])
+    db.one("DELETE from forms WHERE id=$2 AND (forms.user_id=$1 OR forms.dog_id IN (SELECT dogs.id FROM dogs WHERE shelter_id = $1)) RETURNING dog_id, finished",[userID,form_id])
     .then((data)=>{
-        console.log("tu som nieco dostal");
-        db.any("DELETE FROM terms WHERE dog_id = $1 and form_id = $2", [data.dog_id, form_id])
-        .then((data) => {
-            console.log(data)
-            res.status(200).json({"message":"OK"})
-        })
-        .catch((error)=> {
-            console.log(error)
-            res.status(404).json({"message":"No data to be deleted"})
-    })
+        if (data.finished == true) {
+            db.any("DELETE FROM terms WHERE dog_id = $1 and form_id = $2", [data.dog_id, form_id])
+            .then((data) => res.status(200).json({"message":"OK"}))
+            .catch((error)=> res.status(404).json({"message":"No data to be deleted"}))
+        }
+        else {
+            db.any("UPDATE terms SET form_id = null, user_id = null, free = true WHERE dog_id = $1 and form_id = $2", [data.dog_id, form_id])
+            .then((data) => res.status(200).json({"message":"OK"}))
+            .catch((error)=> res.status(404).json({"message":"No data to be updated"}))
+        }       
     })
     .catch((error)=>{
         console.log(error)
