@@ -486,6 +486,7 @@ app.post('/forms/create', (req,res)=>{
         }
     })
     .catch((error)=>{
+        console.log(error);
         res.status(400).json({"message": "No data found"});
         return;
     })
@@ -606,11 +607,19 @@ app.delete('/forms/delete',(req,res)=>{
     userID = tokens[token]["id"];
     db.one("DELETE from forms WHERE id=$2 AND (forms.user_id=$1 OR forms.dog_id IN (SELECT dogs.id FROM dogs WHERE shelter_id = $1)) RETURNING dog_id",[userID,form_id])
     .then((data)=>{
+        console.log("tu som nieco dostal");
         db.any("DELETE FROM terms WHERE dog_id = $1 and form_id = $2", [data.dog_id, form_id])
-        .then((data) => res.status(200).json({"message":"OK"}))
-        .catch((error)=> res.status(404).json({"message":"No data to be deleted"}))
+        .then((data) => {
+            console.log(data)
+            res.status(200).json({"message":"OK"})
+        })
+        .catch((error)=> {
+            console.log(error)
+            res.status(404).json({"message":"No data to be deleted"})
+    })
     })
     .catch((error)=>{
+        console.log(error)
         res.status(404).json({"message": "No data to be deleted"});
     })
 })
