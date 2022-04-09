@@ -433,6 +433,7 @@ app.post('/forms/create', (req,res)=>{
     type = req.body.type;
     reason = req.body.reason;
     details = req.body.details;
+    console.log("TYPE",type)
     if(details == undefined || dog_id == undefined || type==undefined){
         res.status(404).json({"message": "Not all attributes provided"});
         return;
@@ -465,25 +466,35 @@ app.post('/forms/create', (req,res)=>{
             if(term_id == undefined || term_id == null){
                 db.any("DELETE FROM forms WHERE id=$1",[data.id])
                 .then((data)=>{
+                    console.log("Idem posielat ze atributy nie su poskytnute")
                     res.status(400).json({"message": "Not all attributes provided"});
+                    return; 
                 })
                 .catch((error)=>{
+                    console.log("Idem posielat ze nieco sa pokazilo po tych atributoch")
                     res.status(404).json({"message": "No data to be deleted and not all attributes provided"});
-                }) 
+                    return; 
+                })
+                
             }
             db.one("UPDATE terms SET form_id=$1, user_id=$2, free=false WHERE terms.id=$3 RETURNING id",[data.id,userID,term_id])
             .then((data)=>{
                 res.status(200).json({"message":"OK"});
+                return;
             })
             .catch((error)=>{
                 res.status(404).json({"message": "No data to be updated"});
+                return;
             })
         }
-        else
+        else{
             res.status(200).json({"message": "OK"});
+            return;
+        }
     })
     .catch((error)=>{
         res.status(400).json({"message": "No data found"});
+        return;
     })
 })
 //načítanie detailu formulára
