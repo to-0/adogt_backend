@@ -29,7 +29,7 @@ const db = pgp(`postgres://${process.env["DB_USER"]}:${process.env["DB_PASS"]}@l
 // vrati false ak pouzivatel neexistuje
 function check_user(username,email){
     console.log(username, email)
-    db.any('SELECT * FROM users WHERE users.name = $1 or users.email = $2',[username,email])
+    db.one('SELECT * FROM users WHERE users.name = $1 or users.email = $2',[username,email])
     .then((data)=>{
         console.log("user found");
         console.log(data);
@@ -89,7 +89,7 @@ app.get('/users/signUser', (req,res)=>{
 
 })
 // registracia pouzivatela
-app.post('/users/register',(req,res)=>{
+app.post('/users/register', (req,res)=>{
     username = req.body.username;
     email = req.body.email;
     password = req.body.password;
@@ -99,7 +99,14 @@ app.post('/users/register',(req,res)=>{
     // ak pouzivatel neexistuje
     console.log(check_user(username, email))
     var exists = check_user(username, email);
-    if (exists == false){
+
+    db.one('SELECT * FROM users WHERE users.name = $1 or users.email = $2',[username,email])
+    .then((data)=>{
+        console.log("user found");
+        console.log(data);
+        res.status(409).json({'message':'User already exists'});
+    })
+    .catch((error)=>{
         if (username == undefined || email == undefined || password == undefined || shelter == undefined) {
             res.status(404).json({'message':'Not all attributes provided'});
             return;
@@ -118,10 +125,30 @@ app.post('/users/register',(req,res)=>{
             console.log(error)
             res.status(404).json({'message':'Inserting data was not successful'});
         })
-    }
-    else{
-        res.status(409).json({'message':'User already exists'});
-    }
+    })
+    // if (exists == false){
+    //     if (username == undefined || email == undefined || password == undefined || shelter == undefined) {
+    //         res.status(404).json({'message':'Not all attributes provided'});
+    //         return;
+    //     }
+        
+    //     db.one('INSERT INTO users(name,email,password,shelter) VALUES($1, $2, $3,$4) RETURNING id,shelter', [username, email, password,shelter])
+    //     .then((data)=>{
+    //         t = uuidv4();
+    //         console.log(data.id)
+    //         //k tokenom mam idcka a rolu ci je utulok alebo nie
+    //         tokens[t] = {"id":data.id,"shelter":data.shelter}
+    //         console.log(tokens)
+    //         res.json({'message':'OK','token':t});
+    //     })
+    //     .catch((error)=>{
+    //         console.log(error)
+    //         res.status(404).json({'message':'Inserting data was not successful'});
+    //     })
+    // }
+    // else{
+    //     res.status(409).json({'message':'User already exists'});
+    // }
 })
 //nacitanie psov
 app.get('/dogs/getAll', (req, res) => {
