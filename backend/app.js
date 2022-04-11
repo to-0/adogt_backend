@@ -84,7 +84,7 @@ app.get('/users/signUser', (req,res)=>{
         res.json({'message':'OK','token':t, 'shelter': data.shelter, 'email': data.email});
     })
     .catch((error)=>{
-        res.status(404).json({'message':'Invalid username or password'});
+        res.status(404).json({'message':'Nesprávne meno alebo heslo'});
     })
 
 })
@@ -104,11 +104,11 @@ app.post('/users/register', (req,res)=>{
     .then((data)=>{
         console.log("user found");
         console.log(data);
-        res.status(409).json({'message':'User already exists'});
+        res.status(409).json({'message':'Používateľ už existuje'});
     })
     .catch((error)=>{
         if (username == undefined || email == undefined || password == undefined || shelter == undefined) {
-            res.status(404).json({'message':'Not all attributes provided'});
+            res.status(404).json({'message':'Neboli poskytnuté všetky atribúty'});
             return;
         }
         
@@ -123,12 +123,12 @@ app.post('/users/register', (req,res)=>{
         })
         .catch((error)=>{
             console.log(error)
-            res.status(404).json({'message':'Inserting data was not successful'});
+            res.status(404).json({'message':'Vkladanie dát neúspešné.'});
         })
     })
     // if (exists == false){
     //     if (username == undefined || email == undefined || password == undefined || shelter == undefined) {
-    //         res.status(404).json({'message':'Not all attributes provided'});
+    //         res.status(404).json({'message':'Neboli poskytnuté všetky atribúty.'});
     //         return;
     //     }
         
@@ -182,7 +182,7 @@ app.get('/dogs/getAll', (req, res) => {
             return
         })
         .catch((error) => {
-            res.status(404).json({'message': 'No data found'})
+            res.status(404).json({'message': 'Dáta neboli nájdené'})
             return
         })
     }
@@ -207,7 +207,7 @@ app.get('/dogs/getAll', (req, res) => {
             res.json(dogs)
         })
         .catch((error) => {
-            res.status(404).json({'message': 'No data found'})
+            res.status(404).json({'message': 'Dáta neboli nájdené'})
         })
     }
 })
@@ -220,12 +220,12 @@ app.get('/dogs/getDog', (req, res) => {
         return;
 
     if (dog_id == undefined) {
-        res.status(404).json({'message':'Not all attributes provided'});
+        res.status(404).json({'message':'Neboli poskytnuté všetky atribúty.'});
         return;
     }
 
     if (isNaN(parseInt(dog_id))) {
-        res.status(400).json({'message':'Not proper format of attributes.'});
+        res.status(400).json({'message':'Nesprávny formát atribútov'});
         return;
     }
 
@@ -254,7 +254,7 @@ app.get('/dogs/getDog', (req, res) => {
         })
         .catch((error)=>{
             console.log(error)
-            res.status(404).json({'message':'No data found'})
+            res.status(404).json({'message':'Dáta neboli nájdené.'})
         })
     }
     else {
@@ -280,7 +280,7 @@ app.get('/dogs/getDog', (req, res) => {
         })
         .catch((error)=>{
             console.log(error)
-            res.status(404).json({'message':'No data found'})
+            res.status(404).json({'message':'Dáta neboli nájdené.'})
         })
     }
 })
@@ -293,11 +293,11 @@ app.get('/terms', (req, res) => {
         return;
 
     if (dog_id == undefined) {
-        res.status(404).json({'message':'Not all attributes provided'});
+        res.status(404).json({'message':'Neboli poskytnuté všetky atribúty.'});
         return;
     }
     if (isNaN(parseInt(dog_id))) {
-        res.status(400).json({'message':'Not proper format of attributes.'});
+        res.status(400).json({'message':'Nesprávny formát atribútov.'});
         return;
     }
     
@@ -320,7 +320,7 @@ app.get('/terms', (req, res) => {
         })
         .catch((error) => {
             console.log(error)
-            res.status(404).json({'message':'No data found'})
+            res.status(404).json({'message':'Dáta neboli nájdené'})
         })
     }
     else {
@@ -340,7 +340,7 @@ app.get('/terms', (req, res) => {
         })
         .catch((error) => {
             console.log(error)
-            res.status(404).json({'message':'No data found'})
+            res.status(404).json({'message':'Dáta neboli nájdené'})
         })
     }
 })
@@ -361,24 +361,24 @@ app.post('/dogs/addDog', (req, res) => {
     console.log(req.body);
     //photo = req.body.photo;
     if (dog_name == undefined || breed == undefined || age == undefined || details == undefined || health == undefined) {
-        res.status(404).json({"message": "Not all attributes provided"});
+        res.status(404).json({"message": "Neboli poskytnuté všetky atribúty."});
         return;
     }
 
     if (shelter == false) {
-        res.status(401).json({"message": "Signed user is not a shelter"});
+        res.status(401).json({"message": "Prihlásený používateľ nie je útulok."});
         return;
     }
 
     if (isNaN(parseInt(age))) {
-        res.status(400).json({'message':'Not proper format of attributes.'});
+        res.status(400).json({'message':'Nesprávny formát atribútov.'});
         return;
     }
 
     //db.one("INSERT INTO dogs (name, breed, age, details, image_location, shelter_id, health) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ID", [dog_name, breed, age, details, photo, userID, health])
     db.one("INSERT INTO dogs (name, breed, age, details, shelter_id, health) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID", [dog_name, breed, age, details, userID, health])
     .then((data) => res.status(200).json({"message":"OK", "id": data.id}))
-    .catch((error)=> res.status(400).json({"message": "No data to be inserted"}))
+    .catch((error)=> res.status(400).json({"message": "Neexistujú dáta na vloženie."}))
 })
 
 //uprava psa
@@ -396,24 +396,24 @@ app.put('/dogs/editDog', (req, res) => {
     shelter = tokens[token]["shelter"];
     userID = tokens[token]["id"];
     if (dog_name == undefined || breed == undefined || age == undefined || details == undefined || health == undefined || dog_id == undefined) {
-        res.status(404).json({"message": "Not all attributes provided"});
+        res.status(404).json({"message": "Neboli poskytnuté všetky atribúty."});
         return;
     }
 
     if (shelter == false) {
-        res.status(401).json({"message": "Signed user is not a shelter"});
+        res.status(401).json({"message": "Prihlásený používateľ nie je útulok."});
         return;
     }
 
     if (isNaN(parseInt(age))) {
-        res.status(400).json({'message':'Not proper format of attributes.'});
+        res.status(400).json({'message':'Nesprávny formát atribútov.'});
         return;
     }
 
     db.one("UPDATE dogs SET name = $1, breed = $2, age = $3, details = $4, health = $5  WHERE id = $6 and shelter_id=$7 RETURNING id", 
         [dog_name, breed, age, details, health, dog_id,userID])
     .then((data) => res.status(200).json({"message": "OK"}))
-    .catch((error)=> res.status(404).json({"message": "No data to be updated"}))
+    .catch((error)=> res.status(404).json({"message": "Žiadne dáta na úpravu."}))
 })
 
 //vymazanie psa
@@ -426,17 +426,17 @@ app.delete('/dogs/deleteDog', (req, res) => {
         return;
 
     if (dog_id == undefined) {
-        res.status(404).json({"message": "Not all attributes provided"});
+        res.status(404).json({"message": "Neboli poskytnuté všetky atribúty."});
         return;
     }
 
     if (shelter == false) {
-        res.status(401).json({"message": "Signed user is not a shelter"});
+        res.status(401).json({"message": "Prihlásený používateľ nie je útulok."});
         return;
     }
 
     if (isNaN(parseInt(dog_id))) {
-        res.status(400).json({'message':'Not proper format of attributes.'});
+        res.status(400).json({'message':'Nesprávny formát atribútov.'});
         return;
     }
 
@@ -445,7 +445,7 @@ app.delete('/dogs/deleteDog', (req, res) => {
         db.any("DELETE FROM terms WHERE terms.dog_id = $2; DELETE FROM forms WHERE forms.dog_id = $2", [userID, dog_id])
         .then((data) => res.status(200).json({"message": "OK"}))
     })
-    .catch((error) => res.status(404).json({"message": "No data to be deleted"}))
+    .catch((error) => res.status(404).json({"message": "Neexistujú dáta na vymazanie."}))
 })
 
 // vytvorenie formulara
@@ -462,13 +462,13 @@ app.post('/forms/create', (req,res)=>{
     details = req.body.details;
     console.log("TYPE",type)
     if(details == undefined || dog_id == undefined || type==undefined){
-        res.status(404).json({"message": "Not all attributes provided"});
+        res.status(404).json({"message": "Neboli poskytnuté všetky atribúty."});
         return;
     }
 
     if (reason == undefined){
         if (type == 1) {
-            res.status(404).json({"message": "Not all attributes provided"});
+            res.status(404).json({"message": "Neboli poskytnuté všetky atribúty."});
             return;
         }
         if (type == 2)
@@ -476,12 +476,12 @@ app.post('/forms/create', (req,res)=>{
     }
 
     if (shelter == true) {
-        res.status(401).json({"message": "Signed user is a shelter"});
+        res.status(401).json({"message": "Prihlásený používateľ je útulok."});
         return;
     }
 
     if (isNaN(parseInt(dog_id)) || isNaN(parseInt(type))) {
-        res.status(400).json({'message':'Not proper format of attributes.'});
+        res.status(400).json({'message':'Nesprávny formát atribútov.'});
         return;
     }
 
@@ -494,12 +494,12 @@ app.post('/forms/create', (req,res)=>{
                 db.any("DELETE FROM forms WHERE id=$1",[data.id])
                 .then((data)=>{
                     console.log("Idem posielat ze atributy nie su poskytnute")
-                    res.status(400).json({"message": "Not all attributes provided"});
+                    res.status(400).json({"message": "Neboli poskytnuté všetky atribúty."});
                     return; 
                 })
                 .catch((error)=>{
                     console.log("Idem posielat ze nieco sa pokazilo po tych atributoch")
-                    res.status(404).json({"message": "No data to be deleted and not all attributes provided"});
+                    res.status(404).json({"message": "Neexistujú dáta na vymazanie a neboli poskytnuté všetky atribúty."});
                     return; 
                 })
                 
@@ -510,7 +510,7 @@ app.post('/forms/create', (req,res)=>{
                 return;
             })
             .catch((error)=>{
-                res.status(404).json({"message": "No data to be updated"});
+                res.status(404).json({"message": "NEexistujú dáta na úpravu."});
                 return;
             })
         }
@@ -521,7 +521,7 @@ app.post('/forms/create', (req,res)=>{
     })
     .catch((error)=>{
         console.log(error);
-        res.status(400).json({"message": "No data found"});
+        res.status(400).json({"message": "Dáta neboli nájdené."});
         return;
     })
 })
@@ -533,12 +533,12 @@ app.get('/forms/detail',(req,res)=>{
         return;
 
     if (form_id == undefined) {
-        res.status(404).json({"message": "Not all attributes provided"});
+        res.status(404).json({"message": "Neboli poskytnuté všetky atribúty."});
         return;
     }
 
     if (isNaN(parseInt(form_id))) {
-        res.status(400).json({'message':'Not proper format of attributes.'});
+        res.status(400).json({'message':'Nesprávny formát atribútov.'});
         return;
     }
     
@@ -559,7 +559,7 @@ app.get('/forms/detail',(req,res)=>{
     })
     .catch((error)=>{
         console.log(error)
-        res.status(404).json({"message" : "No data found"})
+        res.status(404).json({"message" : "Dáta neboli nájdené."})
     })
 })
 app.get('/forms/getAll',(req,res)=>{
@@ -583,7 +583,7 @@ app.get('/forms/getAll',(req,res)=>{
     })
     .catch((error)=>{
         console.log(error)
-        res.status(404).json({"message": "No data found"})
+        res.status(404).json({"message": "Dáta neboli nájdené."})
     })
 })
 // editovanie formulara
@@ -599,17 +599,17 @@ app.put('/forms/edit',(req,res)=>{
     details = req.body.details;
     finished = req.body.finished;
     if (formId == undefined || reason == undefined || finished == undefined) {
-        res.status(404).json({"message": "Not all attributes provided"});
+        res.status(404).json({"message": "Neboli poskytnuté všetky atribúty."});
         return;
     }
 
     if (shelter == true) {
-        res.status(401).json({"message": "Signed user is a shelter"});
+        res.status(401).json({"message": "Prihlásený používateľ je útulok."});
         return;
     }
 
     if (isNaN(parseInt(formId))) {
-        res.status(400).json({'message':'Not proper format of attributes.'});
+        res.status(400).json({'message':'Nesprávny formát atribútov.'});
         return;
     }
 
@@ -618,7 +618,7 @@ app.put('/forms/edit',(req,res)=>{
         res.status(200).json({"message":"OK"})
     })
     .catch((error)=>{
-        res.status(404).json({"message":"No data to be updated"})
+        res.status(404).json({"message":"Neexistujú dáta na úpravu."})
     })
 })
 // vymazanie formulara
@@ -629,12 +629,12 @@ app.delete('/forms/delete',(req,res)=>{
         return
 
     if (form_id == undefined) {
-        res.status(404).json({"message": "Not all attributes provided"});
+        res.status(404).json({"message": "Neboli poskytnuté všetky atribúty."});
         return;
     }
 
     if (isNaN(parseInt(form_id))) {
-        res.status(400).json({'message':'Not proper format of attributes.'});
+        res.status(400).json({'message':'Nesprávny formát atribútov.'});
         return;
     }
 
@@ -644,17 +644,17 @@ app.delete('/forms/delete',(req,res)=>{
         if (data.finished == true) {
             db.any("DELETE FROM terms WHERE dog_id = $1 and form_id = $2", [data.dog_id, form_id])
             .then((data) => res.status(200).json({"message":"OK"}))
-            .catch((error)=> res.status(404).json({"message":"No data to be deleted"}))
+            .catch((error)=> res.status(404).json({"message":"Neexistujú dáta na vymazanie."}))
         }
         else {
             db.any("UPDATE terms SET form_id = null, user_id = null, free = true WHERE dog_id = $1 and form_id = $2", [data.dog_id, form_id])
             .then((data) => res.status(200).json({"message":"OK"}))
-            .catch((error)=> res.status(404).json({"message":"No data to be updated"}))
+            .catch((error)=> res.status(404).json({"message":"Neexistujú dáta na úpravu."}))
         }       
     })
     .catch((error)=>{
         console.log(error)
-        res.status(404).json({"message": "No data to be deleted"});
+        res.status(404).json({"message": "Neexistujú dáta na vymazanie."});
     })
 })
 // vytvorenie terminov pre psa
@@ -667,17 +667,17 @@ app.post('/terms/create',(req,res)=>{
         return;
 
     if (dog_id == undefined) {
-        res.status(404).json({"message": "Not all attributes provided"});
+        res.status(404).json({"message": "Neboli poskytnuté všetky atribúty."});
         return;
     }
 
     if (shelter == false) {
-        res.status(401).json({"message": "Signed user is not a shelter"});
+        res.status(401).json({"message": "Prihlásený používateľ nie je útulok."});
         return;
     }
 
     if (isNaN(parseInt(dog_id))) {
-        res.status(400).json({'message':'Not proper format of attributes.'});
+        res.status(400).json({'message':'Nesprávny formát atribútov.'});
         return;
     }
 
@@ -717,12 +717,12 @@ app.put('/terms/update',(req,res)=>{
 
     free = req.body.free
     if (term_id == undefined || free == undefined) {
-        res.status(404).json({"message": "Not all attributes provided"});
+        res.status(404).json({"message": "Neboli poskytnuté všetky atribúty."});
         return;
     }
 
     if (isNaN(parseInt(term_id))) {
-        res.status(400).json({'message':'Not proper format of attributes.'});
+        res.status(400).json({'message':'Nesprávny formát atribútov.'});
         return;
     }
 
@@ -732,7 +732,7 @@ app.put('/terms/update',(req,res)=>{
         res.status(200).json({"message": "OK"})
     })
     .catch((error)=>{
-        res.status(404).json({"message": "No data to be updated"})
+        res.status(404).json({"message": "Neexistujú dáta na úpravu."})
     })
 })
 
@@ -744,12 +744,12 @@ app.get('/image', (req, res) => {
         return
 
     if (dog_id == undefined) {
-        res.status(404).json({"message": "Not all attributes provided"});
+        res.status(404).json({"message": "Neboli poskytnuté všetky atribúty."});
         return;
     }
 
     if (isNaN(parseInt(dog_id))) {
-        res.status(400).json({'message':'Not proper format of attributes.'});
+        res.status(400).json({'message':'Nesprávny formát atribútov.'});
         return;
     }
 
@@ -772,7 +772,7 @@ app.get('/image', (req, res) => {
         })
         .catch((error)=>{
             console.log(error)
-            res.status(404).json({'message':'No data found'})
+            res.status(404).json({'message':'Dáta neboli nájdené.'})
         })
     }
     else {
@@ -794,7 +794,7 @@ app.get('/image', (req, res) => {
         })
         .catch((error)=>{
             console.log(error)
-            res.status(404).json({'message':'No data found'})
+            res.status(404).json({'message':'Dáta neboli nájdené.'})
         })
     }
     
@@ -809,17 +809,17 @@ app.post('/image/insert', upload.single('file'), (req, res) => {
 
     shelter = tokens[token]["shelter"];
     if (req.file == undefined || dog_id == undefined) {
-        res.status(404).json({"message": "Not all attributes provided"});
+        res.status(404).json({"message": "Neboli poskytnuté všetky atribúty."});
         return;
     }
 
     if (shelter == false) {
-        res.status(401).json({"message": "Signed user is not a shelter"});
+        res.status(401).json({"message": "Prihlásený používateľ nie je útulok."});
         return;
     }
 
     if (isNaN(parseInt(dog_id))) {
-        res.status(400).json({'message':'Not proper format of attributes.'});
+        res.status(400).json({'message':'Nesprávny formát atribútov.'});
         return;
     }
 
@@ -834,7 +834,7 @@ app.post('/image/insert', upload.single('file'), (req, res) => {
     })
     .catch((error)=>{
         console.log(error)
-        res.status(404).json({'message':'No data to be updated'})
+        res.status(404).json({'message':'Neexistujú dáta na úpravu.'})
     })
 })
 
