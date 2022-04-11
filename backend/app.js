@@ -595,7 +595,7 @@ app.put('/forms/edit',(req,res)=>{
     userID = tokens[token]["id"]; 
     shelter = tokens[token]["shelter"];
     formId = req.query.form_id;
-    reason = req.query.reason;
+    reason = req.body.reason;
     details = req.body.details;
     finished = req.body.finished;
     if (formId == undefined || reason == undefined || finished == undefined) {
