@@ -311,7 +311,9 @@ app.get('/terms', (req, res) => {
                 terms.push( {
                     "id": data[i].id,
                     "date": data[i].time,
-                    "free": data[i].free
+                    "free": data[i].free,
+                    "form_id": data[i].form_id,
+                    "dog_id": data[i].dog_id
                 });
                 console.log(terms)
             }
@@ -331,7 +333,9 @@ app.get('/terms', (req, res) => {
                 terms.push( {
                     "id": data[i].id,
                     "date": data[i].time,
-                    "free": data[i].free
+                    "free": data[i].free,
+                    "form_id": data[i].form_id,
+                    "dog_id": data[i].dog_id
                 });
                 console.log(terms)
             }
