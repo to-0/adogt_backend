@@ -602,7 +602,7 @@ app.put('/forms/edit',(req,res)=>{
     reason = req.body.reason;
     details = req.body.details;
     finished = req.body.finished;
-    if (formId == undefined || reason == undefined || finished == undefined) {
+    if (formId == undefined || finished == undefined) {
         res.status(404).json({"message": "Neboli poskytnuté všetky atribúty."});
         return;
     }
