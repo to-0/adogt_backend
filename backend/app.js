@@ -44,7 +44,7 @@ function check_user(username,email){
 
 function check_token(token, res){
     if (tokens[token] == undefined) {
-        res.status(401).json({"message": "Unauthorized user or invalid token."});
+        res.status(401).json({"message": "Používateľ nie je autorizovaný alebo bol poskytnutý nesprávny token."});
         return false;
     }
     return true
@@ -514,7 +514,7 @@ app.post('/forms/create', (req,res)=>{
                 return;
             })
             .catch((error)=>{
-                res.status(404).json({"message": "NEexistujú dáta na úpravu."});
+                res.status(404).json({"message": "Neexistujú dáta na úpravu."});
                 return;
             })
         }
@@ -711,98 +711,6 @@ function insert_terms(dog_id, time){
         console.log(date)
     }
 }
-
-// uprava terminu
-app.put('/terms/update',(req,res)=>{
-    token = req.query.token;
-    term_id = req.query.term_id;
-    if (!check_token(token, res)) 
-        return;
-
-    free = req.body.free
-    if (term_id == undefined || free == undefined) {
-        res.status(404).json({"message": "Neboli poskytnuté všetky atribúty."});
-        return;
-    }
-
-    if (isNaN(parseInt(term_id))) {
-        res.status(400).json({'message':'Nesprávny formát atribútov.'});
-        return;
-    }
-
-    user_id = tokens[token]["id"]
-    db.one("UPDATE terms SET free=$1, user_id=$2 WHERE id=$3 RETURNING id",[free,user_id,term_id])
-    .then((data)=>{
-        res.status(200).json({"message": "OK"})
-    })
-    .catch((error)=>{
-        res.status(404).json({"message": "Neexistujú dáta na úpravu."})
-    })
-})
-
-//nacitanie obrazku psa
-app.get('/image', (req, res) => {
-    token = req.query.token;
-    dog_id = req.query.dog_id;
-    if (!check_token(token, res))
-        return
-
-    if (dog_id == undefined) {
-        res.status(404).json({"message": "Neboli poskytnuté všetky atribúty."});
-        return;
-    }
-
-    if (isNaN(parseInt(dog_id))) {
-        res.status(400).json({'message':'Nesprávny formát atribútov.'});
-        return;
-    }
-
-    userID = tokens[token]["id"]
-    shelter = tokens[token]["shelter"]
-    if (shelter == true) {
-        db.one('SELECT * FROM dogs WHERE dogs.id = $1 AND dogs.shelter_id = $2', [dog_id, userID])
-        .then((data) => {
-            var raw_data = data.image_data
-            if(raw_data == null){
-                raw_data = ''
-            }
-            image_info = {
-                "type": data.image_type,
-                "name": data.image_name,
-                "data": raw_data.toString('base64')
-            }
-            console.log(image_info)
-            res.json(image_info)
-        })
-        .catch((error)=>{
-            console.log(error)
-            res.status(404).json({'message':'Dáta neboli nájdené.'})
-        })
-    }
-    else {
-        db.one('SELECT * FROM dogs WHERE dogs.id = $1', [dog_id])
-        .then((data) => {
-            console.log(data)
-            var raw_data = data.image_data
-            if(raw_data == null){
-                raw_data = ''
-            }
-            image_info = {
-                "type": data.image_type,
-                "name": data.image_name,
-                "data":raw_data.toString('base64'),
-                "message": "ok"
-            }
-            console.log(image_info)
-            res.json(image_info)
-        })
-        .catch((error)=>{
-            console.log(error)
-            res.status(404).json({'message':'Dáta neboli nájdené.'})
-        })
-    }
-    
-})
 
 //nahratie obrazku psa
 app.post('/image/insert', upload.single('file'), (req, res) => {
