@@ -126,29 +126,6 @@ app.post('/users/register', (req,res)=>{
             res.status(404).json({'message':'Vkladanie dát neúspešné.'});
         })
     })
-    // if (exists == false){
-    //     if (username == undefined || email == undefined || password == undefined || shelter == undefined) {
-    //         res.status(404).json({'message':'Neboli poskytnuté všetky atribúty.'});
-    //         return;
-    //     }
-        
-    //     db.one('INSERT INTO users(name,email,password,shelter) VALUES($1, $2, $3,$4) RETURNING id,shelter', [username, email, password,shelter])
-    //     .then((data)=>{
-    //         t = uuidv4();
-    //         console.log(data.id)
-    //         //k tokenom mam idcka a rolu ci je utulok alebo nie
-    //         tokens[t] = {"id":data.id,"shelter":data.shelter}
-    //         console.log(tokens)
-    //         res.json({'message':'OK','token':t});
-    //     })
-    //     .catch((error)=>{
-    //         console.log(error)
-    //         res.status(404).json({'message':'Inserting data was not successful'});
-    //     })
-    // }
-    // else{
-    //     res.status(409).json({'message':'User already exists'});
-    // }
 })
 //nacitanie psov
 app.get('/dogs/getAll', (req, res) => {
@@ -488,11 +465,29 @@ app.post('/forms/create', (req,res)=>{
         res.status(400).json({'message':'Nesprávny formát atribútov.'});
         return;
     }
-
-    db.one("INSERT INTO forms(form_type,reason,details,dog_id,user_id,created_at,finished) VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, false) RETURNING ID", [type,reason,details,dog_id,userID])
-    .then((data)=>{
-        //ak je to vencenie treba este sparovat termin s formularom
-        if(type==2){
+    if(type == 1){
+        db.one("SELECT * FROM forms WHERE form_type=$1 AND dog_id=$2 AND user_id=$3", [type,dog_id,userID])
+        .then((data)=>{
+            res.status(400).json({"message": "Formulár pre daného psa už existuje"})
+        })
+        .catch((error)=>{
+            db.one("INSERT INTO forms(form_type,reason,details,dog_id,user_id,created_at,finished) VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, false) RETURNING ID", [type,reason,details,dog_id,userID])
+            .then((data)=>{
+            //ak je to vencenie treba este sparovat termin s formularom
+                res.status(200).json({"message": "OK"});
+                return;
+        })
+        .catch((error)=>{
+            console.log(error);
+            res.status(400).json({"message": "Dáta neboli nájdené."});
+            return;
+        })
+        })
+    }
+    else{
+        db.one("INSERT INTO forms(form_type,reason,details,dog_id,user_id,created_at,finished) VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, false) RETURNING ID", [type,reason,details,dog_id,userID])
+            .then((data)=>{
+            //ak je to vencenie treba este sparovat termin s formularom
             term_id = req.body.term_id;
             if(term_id == undefined || term_id == null){
                 db.any("DELETE FROM forms WHERE id=$1",[data.id])
@@ -506,7 +501,6 @@ app.post('/forms/create', (req,res)=>{
                     res.status(404).json({"message": "Neexistujú dáta na vymazanie a neboli poskytnuté všetky atribúty."});
                     return; 
                 })
-                
             }
             db.one("UPDATE terms SET form_id=$1, user_id=$2, free=false WHERE terms.id=$3 RETURNING id",[data.id,userID,term_id])
             .then((data)=>{
@@ -517,18 +511,15 @@ app.post('/forms/create', (req,res)=>{
                 res.status(404).json({"message": "Neexistujú dáta na úpravu."});
                 return;
             })
-        }
-        else{
-            res.status(200).json({"message": "OK"});
+        })
+        .catch((error)=>{
+            console.log(error);
+            res.status(400).json({"message": "Dáta neboli nájdené."});
             return;
+        })
         }
-    })
-    .catch((error)=>{
-        console.log(error);
-        res.status(400).json({"message": "Dáta neboli nájdené."});
-        return;
-    })
-})
+})    
+
 //načítanie detailu formulára
 app.get('/forms/detail',(req,res)=>{
     form_id = req.query.form_id;
